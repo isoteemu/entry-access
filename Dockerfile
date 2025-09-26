@@ -9,6 +9,8 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TAILWIND_VERSION
 
+WORKDIR /app
+
 # Map Docker arch to Tailwind arch and download binary
 RUN set -eux; \
     if [ "$TARGETARCH" = "amd64" ]; then TAILWIND_ARCH="x64"; \
@@ -23,7 +25,15 @@ RUN set -eux; \
 COPY assets ./assets
 COPY templates ./templates
 
-# RUN /usr/local/bin/tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css --map
+# Add fonts, CORS prevents hot-linking.
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Regular.otf ./assets/fonts/Aleo-Regular.otf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Bold.otf ./assets/fonts/Aleo-Bold.otf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Regular.ttf ./assets/fonts/Lato-Regular.ttf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Black.ttf ./assets/fonts/Lato-Black.ttf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Bold.ttf ./assets/fonts/Lato-Bold.ttf
+
+# Compile CSS.
+RUN /usr/local/bin/tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css
 
 FROM golang:${GO_VERSION}-${DEBIAN_VERSION} AS builder
 
@@ -36,7 +46,7 @@ RUN go mod download
 COPY . .
 
 # Copy compiled CSS from tailwind stage
-COPY --from=tailwind ./assets/css/output.css ./assets/css/output.css
+COPY --from=tailwind /app/assets /app/assets
 
 # Use golang devcontainer
 
