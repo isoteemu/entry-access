@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -135,7 +136,8 @@ func (m *MemoryStore) Consume(ctx context.Context, nonce string) (bool, error) {
 
 // janitor runs every second (configurable) and purges expired keys.
 func (m *MemoryStore) janitor() {
-	ticker := time.NewTicker(time.Second)
+	// Skew is x2 to allow safe margin
+	ticker := time.NewTicker(time.Duration(float64(cfg.TokenExpirySkew)*2.0) * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -144,6 +146,7 @@ func (m *MemoryStore) janitor() {
 			m.mu.Lock()
 			for k, exp := range m.entries {
 				if now.After(exp) {
+					slog.Debug("Purging expired nonce", "nonce", k)
 					delete(m.entries, k)
 				}
 			}
