@@ -1,5 +1,5 @@
 # NOTICE: When updating base images, make sure they use the same base image (i.e. debian bookworm)
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.25.1
 ARG DEBIAN_VERSION=bookworm
 ARG TAILWIND_VERSION=4.1.13
 
