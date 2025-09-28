@@ -20,20 +20,19 @@ RUN set -eux; \
         -o /usr/local/bin/tailwindcss && \
     chmod +x /usr/local/bin/tailwindcss
 
-# Copy your project files
-# COPY package.json tailwind.config.js ./
-COPY assets ./assets
-COPY templates ./templates
+#COPY templates ./templates
 
 # Add fonts, CORS prevents hot-linking.
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Regular.otf ./assets/fonts/Aleo-Regular.otf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Bold.otf ./assets/fonts/Aleo-Bold.otf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Regular.ttf ./assets/fonts/Lato-Regular.ttf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Black.ttf ./assets/fonts/Lato-Black.ttf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Bold.ttf ./assets/fonts/Lato-Bold.ttf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Regular.otf ./dist/assets/fonts/Aleo-Regular.otf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Bold.otf ./dist/assets/fonts/Aleo-Bold.otf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Regular.ttf ./dist/assets/fonts/Lato-Regular.ttf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Black.ttf ./dist/assets/fonts/Lato-Black.ttf
+ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Bold.ttf ./dist/assets/fonts/Lato-Bold.ttf
+
+COPY assets ./assets
 
 # Compile CSS.
-RUN /usr/local/bin/tailwindcss -i ./assets/css/input.css -o ./assets/css/output.css
+RUN /usr/local/bin/tailwindcss -i ./assets/css/input.css -o ./dist/assets/css/output.css
 
 FROM golang:${GO_VERSION}-${DEBIAN_VERSION} AS builder
 
@@ -46,11 +45,18 @@ RUN go mod download
 COPY . .
 
 # Copy compiled CSS from tailwind stage
-COPY --from=tailwind /app/assets /app/assets
+COPY --from=tailwind /app/dist /app/dist
 
 # Use golang devcontainer
 
 FROM mcr.microsoft.com/devcontainers/go:${GO_VERSION}-${DEBIAN_VERSION} AS dev
+
+
+# Anonymous volume for compiled stuff
+VOLUME [ "/app/dist" ]
+
+# Copy compiled CSS from tailwind stage
+COPY --from=tailwind /app/dist /app/dist
 
 COPY --from=tailwind --chown=1000:1000 /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
 COPY --from=builder --chown=1000:1000 /go /go
