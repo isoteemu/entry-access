@@ -16,10 +16,16 @@
 	"customizations": {
 		"vscode": {
             "settings": {
-                "go.useLanguageServer": true
+                "go.useLanguageServer": true,
+				"remote.extensionKind": {
+                    "ms-azuretools.vscode-docker": "workspace"
+                }
 			},
+
 			"extensions": [
-				"mikestead.dotenv"
+				"mikestead.dotenv",
+				"esbenp.prettier-vscode",
+				"ms-azuretools.vscode-docker"
 			]
 		}
 	},
@@ -31,7 +37,7 @@
 			"installDockerComposeSwitch": true,
 			"version": "latest",
 			"dockerDashComposeVersion": "v2"
-		},
+		}
 		// "ghcr.io/devcontainers/features/node:1": {
 		// 	"installYarnUsingApt": true,
 		// 	"version": "22",
