@@ -30,6 +30,11 @@ func (c *EntryClaim) GetEntryID() string {
 	return c.EntryID
 }
 
+type DeviceProvisionClaim struct {
+	DeviceID string `json:"device_id"`
+	jwt.RegisteredClaims
+}
+
 // Token errors
 // TODO: When raised, these should be logged as they are signs of hacking attempts
 var (
@@ -41,39 +46,60 @@ var (
 
 // Get token expiry time. now + TokenExpiry
 func getTokenExpiry() time.Time {
-	log.Printf("Token expiry time: %d seconds", cfg.TokenExpiry)
+	log.Printf("Token expiry time: %d seconds", cfg.TokenTTL)
 	// return time.Now().UTC().Add(time.Duration(cfg.TokenExpiry) * time.Second).Unix()
-	return time.Now().UTC().Add(time.Duration(cfg.TokenExpiry) * time.Minute)
+	return time.Now().UTC().Add(time.Duration(cfg.TokenTTL) * time.Minute)
 }
 
-func genEntryToken(entryID string) (string, error) {
+// Generic JWT token generation function
+func generateJWT(claims jwt.Claims) (string, error) {
+	token := jwt.NewWithClaims(tokenSignatureAlg, claims)
+	JWTSecret := []byte(cfg.Secret)
+	return token.SignedString(JWTSecret)
+}
+
+// Generic function to create registered claims with nonce
+func mustCreateRegisteredClaims() jwt.RegisteredClaims {
 	nonce, err := genNonce()
 	if err != nil {
-		return "", err
+		panic(fmt.Sprintf("failed to generate nonce: %v", err))
 	}
 
 	expiry := getTokenExpiry()
 
-	claim := &EntryClaim{
-		EntryID: entryID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        nonce,
-			ExpiresAt: jwt.NewNumericDate(expiry),
-			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-		},
+	return jwt.RegisteredClaims{
+		ID:        nonce,
+		ExpiresAt: jwt.NewNumericDate(expiry),
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 	}
-
-	token := jwt.NewWithClaims(tokenSignatureAlg, claim)
-
-	JWTSecret := []byte(cfg.Secret)
-
-	return token.SignedString(JWTSecret)
 }
 
-// Parse JWT
-// <https://pkg.go.dev/github.com/golang-jwt/jwt/v5#example-NewWithClaims-RegisteredClaims>
-func decodeJWT(token string) (*EntryClaim, error) {
-	parsedToken, err := jwt.ParseWithClaims(token, &EntryClaim{}, func(token *jwt.Token) (interface{}, error) {
+func genEntryToken(entryID string) (string, error) {
+	registeredClaims := mustCreateRegisteredClaims()
+
+	claim := &EntryClaim{
+		EntryID:          entryID,
+		RegisteredClaims: registeredClaims,
+	}
+
+	return generateJWT(claim)
+}
+
+func GenDeviceProvisionToken(deviceID string) (string, error) {
+	registeredClaims := mustCreateRegisteredClaims()
+
+	claim := &DeviceProvisionClaim{
+		DeviceID:         deviceID,
+		RegisteredClaims: registeredClaims,
+	}
+
+	return generateJWT(claim)
+}
+
+func decodeJWT[T jwt.Claims](tokenString string, claimsType T) (T, error) {
+	var zero T
+
+	parsedToken, err := jwt.ParseWithClaims(tokenString, claimsType, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
 		}
@@ -82,15 +108,24 @@ func decodeJWT(token string) (*EntryClaim, error) {
 	}, jwt.WithValidMethods([]string{tokenSignatureAlg.Alg()}))
 
 	if err != nil {
-		return nil, err
+		return zero, err
 	} else if parsedToken == nil || !parsedToken.Valid {
-		return nil, ErrNonValidToken
-	} else if claims, ok := parsedToken.Claims.(*EntryClaim); ok {
+		return zero, ErrNonValidToken
+	} else if claims, ok := parsedToken.Claims.(T); ok {
 		return claims, nil
 	}
 
-	return nil, ErrInvalidClaimType
+	return zero, ErrInvalidClaimType
+}
 
+// Specific function for decoding entry tokens (uses the generic function)
+func decodeEntryJWT(token string) (*EntryClaim, error) {
+	return decodeJWT(token, &EntryClaim{})
+}
+
+// Specific function for decoding device provision tokens
+func DecodeDeviceProvisionJWT(token string) (*DeviceProvisionClaim, error) {
+	return decodeJWT(token, &DeviceProvisionClaim{})
 }
 
 func consumeNonce(nonce string) (bool, error) {
@@ -161,7 +196,7 @@ func main() {
 	fmt.Printf("Generated QR code: %s\n", qrCode)
 
 	// Decode the QR code
-	claims, err := decodeJWT(qrCode)
+	claims, err := decodeEntryJWT(qrCode)
 	if err != nil {
 		log.Fatalf("Error decoding claims: %v", err)
 	}
@@ -181,4 +216,6 @@ func main() {
 		slog.Info("Nonce consumed successfully", "nonce", nonce)
 	}
 
+	server := HTTPServer()
+	server.Run()
 }

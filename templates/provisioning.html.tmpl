@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Provisioning</title>
+    <link href="/dist/assets/css/output.css" rel="stylesheet">
+    <link href="/assets/css/jyu.css" rel="stylesheet">
+    <script src="/config.json"></script>
+</head>
+<body class="bg-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Progressive Layout: Stack on mobile, side-by-side on landscape/desktop -->
+        <div class="flex flex-col lg:flex-row lg:divide-x lg:divide-gray-200">
+            
+            <!-- Left Section: QR Code and Device Info -->
+            <div class="w-full lg:w-1/2 lg:pr-8 pb-8 lg:pb-0">
+                
+                <!-- QR Code Section -->
+                <div class="flex flex-col items-center space-y-6 mb-8">
+                    <!-- QR Code Title -->
+                    <h2 class="text-2xl lg:text-3xl font-light text-gray-900 text-center">
+                        Device Provisioning
+                    </h2>
+
+                    <!-- Device ID Display -->
+                    <div class="bg-gray-50 px-4 py-2 rounded-lg">
+                        <p class="text-sm text-gray-600">Device ID:</p>
+                        <p class="text-lg font-mono text-gray-900" id="device-id">Loading...</p>
+                    </div>
+                    
+                    <!-- QR Code Image - Scalable -->
+                    <div class="w-full max-w-xs sm:max-w-sm lg:max-w-md xl:max-w-lg flex justify-center">
+                        <img alt="Provisioning QR Code" class="w-full h-auto" id="qr-code-image">
+                    </div>
+                    
+                    <!-- QR Code Error Display -->
+                    <!-- TODO -->
+                    
+                    <!-- Status Indicator -->
+                    <div class="flex items-center space-x-2" id="status-indicator">
+                        <div class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                        <span class="text-sm text-gray-600">Waiting for authorization...</span>
+                    </div>
+                </div>
+                
+                <!-- Separator -->
+                <div class="border-t border-gray-200 my-8"></div>
+                
+                <!-- Instructions Section -->
+                <div class="space-y-4">
+                    <h3 class="text-lg font-medium text-gray-900">Provisioning Steps:</h3>
+                    <div class="space-y-3 text-gray-600">
+                        <div class="flex items-start">
+                            <span class="bg-blue-50 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3 mt-0.5">1</span>
+                            <span>A unique ID has been generated for this entry point device</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="bg-blue-50 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3 mt-0.5">2</span>
+                            <span>Scan the QR code connected to an authorized network with provisioning device</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="bg-blue-50 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3 mt-0.5">3</span>
+                            <span>Complete authorization on provisioning device</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="bg-blue-50 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3 mt-0.5">4</span>
+                            <span>Select the entry point this device is authorized for</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="bg-blue-50 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3 mt-0.5">5</span>
+                            <span>Wait until the provisioning process is complete</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Section: Security Information -->
+            <div class="w-full lg:w-1/2 lg:pl-8 pt-8 lg:pt-0">
+                <h3 class="text-2xl font-light text-gray-900 mb-6">Security Information</h3>
+                
+                <div class="space-y-4 text-gray-600 leading-relaxed">
+                    <p>
+                        Your device is requesting access to the door entry system. This QR code contains 
+                        unique device identifier and client information for secure provisioning.
+                    </p>
+
+                    <!-- Separator -->
+                    <div class="border-t border-gray-200 my-6"></div>
+                    
+                    <p>
+                        Once authorized, this device will receive a JWT token valid for 2 days. 
+                        The system will automatically refresh its credentials when they are 
+                        within 1 day of expiration.
+                    </p>
+                    
+                    <div class="bg-blue-50 p-4 rounded-lg mt-6">
+                        <h5 class="font-medium text-blue-900 mb-2">Important Notes:</h5>
+                        <ul class="text-sm text-blue-800 space-y-1">
+                            <li>• Keep this device secure during the provisioning process</li>
+                            <li>• Do not share the QR code with unauthorized persons</li>
+                            <li>• The device ID is stored locally and identifies this specific device</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer Separator -->
+        <div class="border-t border-gray-200 mt-12 pt-8 text-center">
+            <p class="text-gray-400 text-sm">
+                Secure device provisioning for door entry system
+            </p>
+        </div>
+    </div>
+
+    <!-- JavaScript for device provisioning -->
+    <script type="module">
+        import {DeviceProvisioning, loadConfig} from '/assets/js/app.js';
+
+        const config = await loadConfig();
+
+        // Initialize device provisioning
+        const provisioning = new DeviceProvisioning();
+        const deviceId = provisioning.initialize();
+
+        // Build QR code URL with device ID and client ID
+        let qrImageUrl = '{{.QRCodeURL}}';
+
+        // Display device ID
+        document.getElementById('device-id').textContent = deviceId;
+        
+        // Handle QR code loading errors
+        const qrImage = document.getElementById('qr-code-image');
+        const qrError = document.getElementById('qr-code-error');
+
+        // Poll for authorization status
+        let pollInterval;
+
+        function refreshQRCode() {
+            const urlParams = new URLSearchParams();
+            urlParams.append('device_id', deviceId);
+            urlParams.append('cb', Date.now());
+
+            const separator = qrImageUrl.includes('?') ? '&' : '?';
+            let imageSrc = qrImageUrl + separator + urlParams.toString();
+
+            qrImage.src = imageSrc;
+            console.log('QR code refreshed with URL:', imageSrc);
+        }
+
+        function pollAuthorizationStatus() {
+            // Check if device has been authorized
+            const authToken = localStorage.getItem('device_auth');
+            
+            if (authToken) {
+                // Device has been authorized
+                updateStatus('authorized', 'Device authorized successfully!');
+                clearInterval(pollInterval);
+                
+                // Redirect to main app or show success message
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                // Still waiting for authorization
+                updateStatus('waiting', 'Waiting for authorization...');
+            }
+        }
+        
+        function updateStatus(status, message) {
+            const indicator = document.getElementById('status-indicator');
+            const dot = indicator.querySelector('div');
+            const text = indicator.querySelector('span');
+            
+            if (status === 'authorized') {
+                dot.className = 'w-3 h-3 bg-green-400 rounded-full';
+                text.className = 'text-sm text-green-600';
+            } else {
+                dot.className = 'w-3 h-3 bg-yellow-400 rounded-full animate-pulse';
+                text.className = 'text-sm text-gray-600';
+            }
+            
+            text.textContent = message;
+        }
+
+        // Start polling every 2 seconds
+        pollInterval = setInterval(pollAuthorizationStatus, 2000);
+
+        // Initial status check
+        pollAuthorizationStatus();
+
+        // Start QR image refresh
+        setInterval(refreshQRCode, config.TokenTTL * 1000);
+        refreshQRCode();
+
+    </script>
+</body>
+</html>
