@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const DEFAULT_SUPPORT_URL = "https://github.com/isoteemu/entry-access"
+
 type Config struct {
 	// Secret key for signing tokens. Must be set in production.
 	Secret string `mapstructure:"secret"`
@@ -19,7 +21,7 @@ type Config struct {
 	LogLevel        string `mapstructure:"log_level"`
 	AllowedNetworks string `mapstructure:"allowed_networks"`
 
-	HTTPPort uint `mapstructure:"http_port"`
+	SupportURL string `mapstructure:"support_url"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -32,6 +34,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("NONCE_STORE", "memory")
 	viper.SetDefault("ALLOWED_NETWORKS", "")
+	viper.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
 
 	// Load configuration from environment variables
 	viper.AutomaticEnv()
