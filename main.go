@@ -8,12 +8,17 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
+	qrcode "github.com/skip2/go-qrcode"
 )
+
+const QR_IMAGE_SIZE = 512
+const DIST_DIR = "dist"
 
 var cfg *Config
 var nonceStore NonceStore
@@ -166,6 +171,23 @@ func InitLogger(cfg *Config) {
 	}
 }
 
+// Generate static QR code for support
+func genSupportQr(url string) {
+	qrCode, err := qrcode.Encode(url, qrcode.Medium, QR_IMAGE_SIZE)
+	if err != nil {
+		log.Fatalf("Error generating support QR code: %v", err)
+	}
+
+	filePath := fmt.Sprintf("%s/assets/support_qr.png", DIST_DIR)
+
+	// Save the QR code to a file
+	if err := os.WriteFile(filePath, qrCode, 0644); err != nil {
+		slog.Error("Error saving support QR code", "error", err)
+	} else {
+		slog.Debug("Support QR code saved successfully", "file_path", filePath, "support_url", url)
+	}
+}
+
 func main() {
 	// Load config
 	var err error
@@ -184,19 +206,20 @@ func main() {
 		log.Fatalf("Error creating nonce store: %v", err)
 	}
 
+	// --- TESTING ---
 	doorID := "Ag C331"
 
 	// Generate a QR code for a door
-	qrCode, err := genEntryToken(doorID)
+	entry_token, err := genEntryToken(doorID)
 	if err != nil {
 		log.Fatalf("Error generating QR code: %v", err)
 	}
 
-	// Print the QR code
-	fmt.Printf("Generated QR code: %s\n", qrCode)
+	// Print the entry token
+	fmt.Printf("Generated entry token: %s\n", entry_token)
 
-	// Decode the QR code
-	claims, err := decodeEntryJWT(qrCode)
+	// Decode the entry token
+	claims, err := decodeEntryJWT(entry_token)
 	if err != nil {
 		log.Fatalf("Error decoding claims: %v", err)
 	}
@@ -216,6 +239,12 @@ func main() {
 		slog.Info("Nonce consumed successfully", "nonce", nonce)
 	}
 
+	// --- APP ---
+	if cfg.SupportURL != "" {
+		genSupportQr(cfg.SupportURL)
+	}
+
+	// Initialize HTTP server
 	server := HTTPServer()
 	server.Run()
 }

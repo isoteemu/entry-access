@@ -17,8 +17,6 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
-const QR_IMAGE_SIZE = 512
-
 func checkProvisioning(c *gin.Context) (error, bool) {
 	slog.Debug("Provisioning not implemented yet!")
 	return nil, true
@@ -161,8 +159,12 @@ func HTTPServer() *gin.Engine {
 	r.Use(securityHeaders)
 
 	r.GET("/ping", func(c *gin.Context) {
+		msg := c.Query("ping")
+		if msg == "" {
+			msg = "pong"
+		}
 		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
+			"message": msg,
 		})
 	})
 
@@ -220,6 +222,7 @@ func HTTPServer() *gin.Engine {
 		var clientCfg = gin.H{
 			"TokenTTL":        cfg.TokenTTL,
 			"TokenExpirySkew": cfg.TokenExpirySkew,
+			"SupportURL":      cfg.SupportURL,
 		}
 
 		c.JSON(http.StatusOK, clientCfg)
