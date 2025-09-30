@@ -1,13 +1,17 @@
 # NOTICE: When updating base images, make sure they use the same base image (i.e. debian bookworm)
-ARG GO_VERSION=1.25.1
+ARG GO_VERSION=1.25
 ARG DEBIAN_VERSION=bookworm
 ARG TAILWIND_VERSION=4.1.13
 
-FROM node:22-${DEBIAN_VERSION} AS tailwind
+# Directory for build artifacts
+ARG DIST_DIR=dist
+
+FROM node:22-${DEBIAN_VERSION} AS assets-builder
 
 ARG TARGETOS
 ARG TARGETARCH
 ARG TAILWIND_VERSION
+ARG DIST_DIR
 
 WORKDIR /app
 
@@ -21,18 +25,10 @@ RUN set -eux; \
     chmod +x /usr/local/bin/tailwindcss
 
 #COPY templates ./templates
-
-# Add fonts, CORS prevents hot-linking.
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Regular.otf ./dist/assets/fonts/Aleo-Regular.otf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/aleo/Aleo-Bold.otf ./dist/assets/fonts/Aleo-Bold.otf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Regular.ttf ./dist/assets/fonts/Lato-Regular.ttf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Black.ttf ./dist/assets/fonts/Lato-Black.ttf
-ADD https://www.jyu.fi/themes/custom/jyu/fonts/Lato/Lato-Bold.ttf ./dist/assets/fonts/Lato-Bold.ttf
-
+COPY Makefile ./
 COPY assets ./assets
 
-# Compile CSS.
-RUN /usr/local/bin/tailwindcss -i ./assets/css/input.css -o ./dist/assets/css/output.css
+RUN make assets DIST_DIR="${DIST_DIR}"
 
 FROM golang:${GO_VERSION}-${DEBIAN_VERSION} AS builder
 
@@ -44,20 +40,23 @@ RUN go mod download
 
 COPY . .
 
-# Copy compiled CSS from tailwind stage
-COPY --from=tailwind /app/dist /app/dist
+# Copy compiled CSS from asset builder stage
+COPY --from=assets-builder /app/${DIST_DIR} ${DIST_DIR}
 
 # Use golang devcontainer
 
 FROM mcr.microsoft.com/devcontainers/go:${GO_VERSION}-${DEBIAN_VERSION} AS dev
 
+ARG DIST_DIR
 
-# Anonymous volume for compiled stuff
-VOLUME [ "/app/dist" ]
+WORKDIR /app
+
+# Default anonymous volume for compiled stuff
+VOLUME [ "/app/${DIST_DIR}" ]
 
 # Copy compiled CSS from tailwind stage
-COPY --from=tailwind /app/dist /app/dist
+COPY --from=assets-builder /app/${DIST_DIR} ${DIST_DIR}
 
-COPY --from=tailwind --chown=1000:1000 /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
+COPY --from=assets-builder --chown=1000:1000 /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
 COPY --from=builder --chown=1000:1000 /go /go
 COPY --from=builder --chown=1000:1000 /app /app
