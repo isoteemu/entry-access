@@ -6,7 +6,12 @@
     <title>Device Provisioning</title>
     <link href="/dist/assets/css/output.css" rel="stylesheet">
     <link href="/assets/css/jyu.css" rel="stylesheet">
-    <script src="/config.json"></script>
+
+    <!-- Prefetch Error QR -->
+    <link rel="prefetch" href="/dist/assets/support_qr.png" as="image">
+    <link rel="prefetch" href="/config.json" as="fetch">
+
+    <script type="module">import * as main from '/assets/js/main.js';</script>
 </head>
 <body class="bg-white min-h-screen">
     <div class="container mx-auto px-4 py-8">
@@ -27,6 +32,8 @@
                     <div class="bg-gray-50 px-4 py-2 rounded-lg">
                         <p class="text-sm text-gray-600">Device ID:</p>
                         <p class="text-lg font-mono text-gray-900" id="device-id">Loading...</p>
+                        <p class="text-sm text-gray-600 mt-1">Emoji Code:</p>
+                        <p class="text-2xl text-center" id="device-emoji">Loading...</p>
                     </div>
                     
                     <!-- QR Code Image - Scalable -->
@@ -107,16 +114,38 @@
         </div>
         
         <!-- Footer Separator -->
-        <div class="border-t border-gray-200 mt-12 pt-8 text-center">
-            <p class="text-gray-400 text-sm">
-                Secure device provisioning for door entry system
-            </p>
+        <div class="border-t border-gray-200 mt-12 pt-8">
+            <!-- Status Area -->
+            <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full" id="server-status-dot"></div>
+                        <span class="text-sm text-gray-600">Server Status:</span>
+                        <span class="text-sm font-medium" id="server-status-text">OK</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-blue-400 rounded-full" id="connection-status-dot"></div>
+                        <span class="text-sm text-gray-600">Connection:</span>
+                        <span class="text-sm font-medium" id="connection-status-text">Active</span>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-400">
+                    Last updated: <span id="last-updated">--:--</span>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <p class="text-gray-400 text-sm">
+                    Secure device provisioning for door entry system
+                </p>
+            </div>
         </div>
     </div>
 
     <!-- JavaScript for device provisioning -->
     <script type="module">
         import {DeviceProvisioning, loadConfig} from '/assets/js/app.js';
+        import { UUIDtoSAS } from '/assets/js/shortcode.js';
 
         const config = await loadConfig();
 
@@ -129,6 +158,15 @@
 
         // Display device ID
         document.getElementById('device-id').textContent = deviceId;
+        
+        // Generate and display emoji representation
+        try {
+            const emojiCode = await UUIDtoSAS(deviceId);
+            document.getElementById('device-emoji').textContent = emojiCode;
+        } catch (error) {
+            console.error('Error generating emoji code:', error);
+            document.getElementById('device-emoji').textContent = 'Error loading emojis';
+        }
         
         // Handle QR code loading errors
         const qrImage = document.getElementById('qr-code-image');
