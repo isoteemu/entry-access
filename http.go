@@ -15,6 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	qrcode "github.com/skip2/go-qrcode"
+
+	. "entry-access-control/utils"
 )
 
 const QR_IMAGE_SIZE = 512
@@ -132,15 +134,6 @@ func getEntryToken(entryID string) (string, error) {
 	return token, nil
 }
 
-// Helper function to generate a URL for a given path
-func urlFor(c *gin.Context, path string) string {
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
-	}
-	return fmt.Sprintf("%s://%s%s", scheme, c.Request.Host, path)
-}
-
 func HTTPServer() *gin.Engine {
 	r := gin.Default()
 
@@ -170,7 +163,7 @@ func HTTPServer() *gin.Engine {
 		// Cache buster
 		cacheBuster := strconv.FormatInt(time.Now().UTC().Unix(), 16)
 
-		qr_url := urlFor(c, "/api/device/provision/qr?cb="+cacheBuster)
+		qr_url := UrlFor(c, "/api/device/provision/qr?cb="+cacheBuster)
 
 		// Render page
 		c.HTML(http.StatusOK, "provisioning.html.tmpl", gin.H{"QRCodeURL": qr_url})
@@ -197,7 +190,7 @@ func HTTPServer() *gin.Engine {
 			return
 		}
 
-		provisioningURL := urlFor(c, "/api/device/authorize?"+token)
+		provisioningURL := UrlFor(c, "/api/device/authorize?"+token)
 
 		qrCode, err := qrcode.Encode(provisioningURL, qrcode.Medium, QR_IMAGE_SIZE)
 		if err != nil {
@@ -262,7 +255,7 @@ func HTTPServer() *gin.Engine {
 		// Generate URL
 
 		// Generate URL pointing to self
-		url := urlFor(c, "/e/"+token)
+		url := UrlFor(c, "/e/"+token)
 
 		// We could cache qr code, but it takes milliseconds to generate
 		qr, err := qrcode.Encode(url, qrcode.Medium, QR_IMAGE_SIZE)
@@ -277,7 +270,7 @@ func HTTPServer() *gin.Engine {
 	})
 
 	r.GET("/", func(ctx *gin.Context) {
-		var qr_url = urlFor(ctx, "/qr")
+		var qr_url = UrlFor(ctx, "/qr")
 		ctx.HTML(http.StatusOK, "qr.html.tmpl", gin.H{"QRCodeURL": qr_url})
 	})
 
