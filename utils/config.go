@@ -18,8 +18,6 @@ type Config struct {
 	NonceStore      string `mapstructure:"nonce_store"`
 	LogLevel        string `mapstructure:"log_level"`
 	AllowedNetworks string `mapstructure:"allowed_networks"`
-
-	HTTPPort uint `mapstructure:"http_port"`
 }
 
 func LoadConfig() (*Config, error) {
