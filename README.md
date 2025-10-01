@@ -8,6 +8,14 @@
 4. QR code is scanned at the door for entry.
 5. System validates the JWT and nonce before granting access.
 
+### Technologies used
+
+- Go (Gin framework)
+- slog (logging)
+- JWT (github.com/golang-jwt/jwt/v5)
+- QR Code generation (github.com/skip2/go-qrcode)
+- Tailwind CSS (frontend)
+
 ## TODO
 
 ### User authentication
