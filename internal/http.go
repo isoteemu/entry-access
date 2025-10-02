@@ -72,7 +72,7 @@ func IPAccessControl(allowedCIDRs []string) gin.HandlerFunc {
 func HTTPServer() *gin.Engine {
 	r := gin.Default()
 
-	r.Static("/web/assets/", "./web/assets/")
+	r.Static("/assets/", "./web/assets/")
 	r.Static("/dist/assets", "./dist/assets") // Serve compiled CSS and fonts
 
 	r.LoadHTMLGlob("web/templates/*")

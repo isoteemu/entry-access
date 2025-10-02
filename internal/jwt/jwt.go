@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	. "entry-access-control/internal/config"
 	. "entry-access-control/internal/utils"
 	"errors"
@@ -37,7 +38,11 @@ func DecodeEntryJWT(tokenString string) (*EntryClaim, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ok, err := NonceStore.Consume(nil, claims.ID); err != nil || !ok {
+	ctx := context.Background()
+	// Consume nonce to prevent replay attacks
+	// Note: This must be done after validating the token to avoid DoS attacks
+	// with random nonces.
+	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
 		if err != nil {
 			return nil, err
 		}
@@ -57,11 +62,10 @@ type DeviceProvisionClaim struct {
 // clientIP: IP address of the client requesting the token for preventing hijacking
 func NewDeviceProvisionClaim(deviceId string, clientIP string) DeviceProvisionClaim {
 	// TODO: Make TTL configurable
-	var ttl uint = 5 * 60 // Device provision tokens are valid for 5 minutes
 	return DeviceProvisionClaim{
 		DeviceID:         deviceId,
 		ClientIP:         clientIP,
-		RegisteredClaims: mustCreateRegisteredClaim(ttl),
+		RegisteredClaims: mustCreateRegisteredClaim(5 * 60),
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 
 	. "entry-access-control/internal"
 	. "entry-access-control/internal/config"
+	. "entry-access-control/internal/utils"
 
 	"github.com/joho/godotenv"
 	qrcode "github.com/skip2/go-qrcode"
@@ -67,6 +68,7 @@ func main() {
 	}
 
 	InitLogger(Cfg)
+	InitNonceStore(Cfg)
 
 	if Cfg.SupportURL != "" {
 		genSupportQr(Cfg.SupportURL)
