@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 )
 
 const DEFAULT_SUPPORT_URL = "https://github.com/isoteemu/entry-access"
+const QR_IMAGE_SIZE = 512
 
 type Config struct {
 	// Secret key for signing tokens. Must be set in production.
@@ -24,6 +25,9 @@ type Config struct {
 	SupportURL string `mapstructure:"support_url"`
 }
 
+var Cfg *Config
+
+// LoadConfig reads configuration from environment variables and returns a Config struct.
 func LoadConfig() (*Config, error) {
 	var cfg Config
 

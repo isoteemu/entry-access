@@ -1,9 +1,10 @@
-package main
+package utils
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	. "entry-access-control/internal/config"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,11 +12,10 @@ import (
 	"time"
 )
 
-// Number of random bytes. 16 → 128‑bit
-const nonceSize = 16
+var NonceStore NonceStoreInterface
 
-// Nonce TTL in seconds
-const nonceTTL = 120 * time.Second
+// Number of random bytes. 16 → 128‑bit
+const NONCE_SIZE = 16
 
 type NonceStoreType string
 
@@ -45,7 +45,7 @@ func (e *NonceExpiredError) Error() string {
 	return fmt.Sprintf("nonce expired: %s (expiry: %s)", e.Nonce, e.Expiry)
 }
 
-type NonceStore interface {
+type NonceStoreInterface interface {
 	// stores a nonce with a TTL.
 	Put(ctx context.Context, nonce string, ttl time.Duration) error
 	// verifies and deletes the nonce.
@@ -53,8 +53,8 @@ type NonceStore interface {
 	Consume(ctx context.Context, nonce string) (bool, error)
 }
 
-func GenerateNonce() (string, error) {
-	size := nonceSize
+func generateNonceToken() (string, error) {
+	size := NONCE_SIZE
 	if size <= 0 {
 		fmt.Println("Invalid nonce size, using default 16 bytes")
 		size = 16
@@ -67,8 +67,24 @@ func GenerateNonce() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+// Creates a new nonce, stores it in the nonce store, and returns it.
+func Nonce(ttl uint) (string, error) {
+	nonce, err := generateNonceToken()
+	if err != nil {
+		return "", err
+	}
+
+	nonceTTL := time.Duration(ttl) * time.Second
+
+	ctx := context.Background()
+	if err := NonceStore.Put(ctx, nonce, nonceTTL); err != nil {
+		slog.Error("failed to store nonce", "error", err)
+	}
+	return nonce, nil
+}
+
 // NewStore builds the appropriate Store implementation based on cfg.
-func NewStore(cfg *Config) (NonceStore, error) {
+func NewStore(cfg *Config) (NonceStoreInterface, error) {
 	switch cfg.NonceStore {
 	case "memory":
 		return NewMemoryStore(), nil
@@ -137,7 +153,7 @@ func (m *MemoryStore) Consume(ctx context.Context, nonce string) (bool, error) {
 // janitor runs every second (configurable) and purges expired keys.
 func (m *MemoryStore) janitor() {
 	// Skew is x2 to allow safe margin
-	ticker := time.NewTicker(time.Duration(float64(cfg.TokenExpirySkew)*2.0) * time.Second)
+	ticker := time.NewTicker(time.Duration(float64(Cfg.TokenExpirySkew)*2.0) * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -160,4 +176,14 @@ func (m *MemoryStore) janitor() {
 // Close stops the janitor
 func (m *MemoryStore) Close() {
 	close(m.stop)
+}
+
+func InitNonceStore(cfg *Config) error {
+	store, err := NewStore(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize nonce store: %w", err)
+	}
+	NonceStore = store
+	slog.Info("Initialized nonce store", "type", cfg.NonceStore)
+	return nil
 }
