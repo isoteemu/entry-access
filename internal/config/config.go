@@ -22,6 +22,9 @@ type Config struct {
 	LogLevel        string `mapstructure:"log_level"`
 	AllowedNetworks string `mapstructure:"allowed_networks"`
 
+	// User authentication TTL in days.
+	UserAuthTTL uint `mapstructure:"user_auth_ttl"`
+
 	SupportURL string `mapstructure:"support_url"`
 }
 
@@ -38,6 +41,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("NONCE_STORE", "memory")
 	viper.SetDefault("ALLOWED_NETWORKS", "")
+
+	viper.SetDefault("USER_AUTH_TTL", 8) // 8 days
+
 	viper.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
 
 	// Load configuration from environment variables

@@ -51,6 +51,31 @@ func DecodeEntryJWT(tokenString string) (*EntryClaim, error) {
 	return claims, nil
 }
 
+// AuthClaims represents the expected claims in the JWT token
+type AuthClaims struct {
+	UserID string `json:"uid"`
+	// Add other fields as necessary
+	jwt.RegisteredClaims
+}
+
+func NewAuthClaims(uid string) *AuthClaims {
+	return &AuthClaims{
+		UserID: uid,
+	}
+}
+
+func DecodeAuthJWT(tokenString string) (*AuthClaims, error) {
+
+	claims, err := decodeJWT(tokenString, &AuthClaims{})
+	if err != nil {
+		return nil, err
+	}
+	// Note: We do not consume the nonce here as auth tokens are long-lived and
+	// can be renewed. Nonce consumption is done during token renewal.
+	// This is to prevent DoS attacks with random nonces.
+	return claims, nil
+}
+
 type DeviceProvisionClaim struct {
 	DeviceID string `json:"device_id"`
 	ClientIP string `json:"client_ip"`
@@ -80,6 +105,17 @@ func mustCreateRegisteredClaim(ttl uint) jwt.RegisteredClaims {
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 		ExpiresAt: jwtExpiry(ttl),
 	}
+}
+
+func consumeClaimNonce(claims *jwt.RegisteredClaims) error {
+	ctx := context.Background()
+	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
+		if err != nil {
+			return err
+		}
+		return ErrInvalidNonce
+	}
+	return nil
 }
 
 // Convert TTL to time in future

@@ -97,8 +97,14 @@ func HTTPServer() *gin.Engine {
 		if msg == "" {
 			msg = "pong"
 		}
+
+		authenticated := false
+		if c.GetString("userID") != "" {
+			authenticated = true
+		}
 		c.JSON(http.StatusOK, gin.H{
-			"message": msg,
+			"message":       msg,
+			"authenticated": authenticated,
 		})
 	})
 
@@ -125,6 +131,10 @@ func HTTPServer() *gin.Engine {
 	// Entry access routes
 	rg = r.Group("/entry")
 	routes.EntryRoute(rg)
+
+	// Authentication routes
+	auth_rg := r.Group("/auth")
+	routes.AuthRoutes(auth_rg)
 
 	return r
 }
