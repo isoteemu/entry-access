@@ -13,14 +13,19 @@ import (
 	. "entry-access-control/internal/config"
 	. "entry-access-control/internal/utils"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	sloggin "github.com/samber/slog-gin"
 	qrcode "github.com/skip2/go-qrcode"
 )
 
 const DIST_DIR = "dist"
 
 // Initialize logger
-func InitLogger(cfg *Config) {
+func InitLogger(cfg *Config) *slog.Logger {
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
 	logLevel := strings.ToUpper(cfg.LogLevel)
 
@@ -37,6 +42,7 @@ func InitLogger(cfg *Config) {
 		slog.SetLogLoggerLevel(slog.LevelInfo)
 		slog.Warn("Invalid log level, defaulting to info", "log_level", cfg.LogLevel)
 	}
+	return logger
 }
 
 // Generate static QR code for support
@@ -67,7 +73,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	InitLogger(Cfg)
+	logger := InitLogger(Cfg)
 	InitNonceStore(Cfg)
 
 	if Cfg.SupportURL != "" {
@@ -76,5 +82,9 @@ func main() {
 
 	// Initialize HTTP server
 	server := HTTPServer()
+
+	// Add logging middleware
+	server.Use(sloggin.New(logger), gin.Recovery())
+
 	server.Run()
 }
