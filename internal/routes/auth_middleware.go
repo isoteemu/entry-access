@@ -44,6 +44,18 @@ func setAuthCookie(c *gin.Context, token string) {
 	)
 }
 
+func NewAuth(c *gin.Context, userId string) error {
+	// Create new auth token
+	claim := NewAuthClaims(userId)
+	token, err := GenerateJWT(claim)
+	if err != nil {
+		return err
+	}
+	// Set auth cookie
+	setAuthCookie(c, token)
+	return nil
+}
+
 func verifyAuth(c *gin.Context) (string, error) {
 	// Get auth token from cookie
 	token, err := c.Cookie(authCookieName)
@@ -86,24 +98,19 @@ func renewAuth(c *gin.Context, userId string, forceRenew bool) error {
 				forceRenew = true
 			}
 		}
-	} else {
+	} else if !forceRenew {
 		slog.Warn("renewAuth: No existing auth token found", "error", err)
 		c.AbortWithError(AUTH_FAIL_STATUS, err)
 	}
 
 	if !forceRenew {
 		// Early stop: No need to renew
+		slog.Debug("renewAuth: No need to renew auth token", "userID", userId)
 		return nil
 	}
 
-	// Generate new auth token
-	claim := NewAuthClaims(userId)
-	token, err := GenerateJWT(claim)
-	if err != nil {
-		return err
-	}
-	// Set auth cookie
-	setAuthCookie(c, token)
+	// Create new auth token
+	NewAuth(c, userId)
 	return nil
 }
 
