@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Door Entry Login Link</title>
+    <style>
+        body {
+            font-family: "Lato", "Lucida Grande", "Tahoma", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background-color: #003366;
+            color: #ffffff;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-family: "Aleo", sans-serif;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333333;
+        }
+        
+        .entry-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #003366;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .entry-name {
+            font-family: "Aleo", sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #003366;
+            margin-bottom: 10px;
+        }
+        
+        .login-button {
+            display: inline-block;
+            background-color: #003366;
+            color: #ffffff;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 700;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .login-button:hover {
+            background-color: #004080;
+        }
+        
+        .security-info {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        .details {
+            font-size: 14px;
+            color: #666666;
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        
+        .details-row {
+            margin-bottom: 8px;
+        }
+        
+        .label {
+            font-weight: 700;
+            display: inline-block;
+            width: 80px;
+        }
+        
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #666666;
+        }
+        
+        @media only screen and (max-width: 600px) {
+            .container {
+                width: 100% !important;
+                margin: 0 !important;
+            }
+            
+            .content {
+                padding: 20px !important;
+            }
+            
+            .header {
+                padding: 20px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Access to {{.EntryName}}</h1>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Hello,
+            </div>
+            <p>You have requested access to {{.EntryName}}. Clicking the button below will allow us to verify your access.</p>
+            
+            <!-- <div class="entry-info">
+                <div class="entry-name">{{.EntryName}}</div>
+                <p>Click the link below to complete verification:</p>
+            </div>
+             -->
+            <div style="text-align: center;">
+                <a href="{{.Link}}" class="login-button">Verify access</a>
+            </div>
+            
+            <div style="text-align: center; margin-top: 10px;">
+                <p style="font-size: 12px; color: #666666; margin: 5px 0;">If the button above doesn't work, copy and paste this link into your browser:</p>
+                <p style="font-size: 12px; color: #003366; word-break: break-all; margin: 0; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 3px;">{{.Link}}</p>
+            </div>
+            
+            <div class="security-info">
+                <strong>Security Notice:</strong> This link will expire on {{.Expires}}. For security reasons, do not share this link with others.
+            </div>
+
+            <div class="details">
+                <div class="details-row">
+                    <span class="label">Expires:</span> {{.Expires}}
+                </div>
+                <div class="details-row">
+                    <span class="label">Location:</span> {{.Location}}
+                </div>
+                <div class="details-row">
+                    <span class="label">IP Address:</span> {{.IP}}
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>This is an operational email. If you did not request this access, please ignore this email.</p>
+            <p>For security reasons, this link is valid for a limited time only.</p>
+            <p>Please do not reply to this email. Replies to this email will not be responded to or read.</p>
+        </div>
+    </div>
+</body>
+</html>

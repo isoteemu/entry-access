@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Door Entry System</title>
+
+    <link href="/dist/assets/css/output.css" rel="stylesheet">
+    <link href="/assets/css/jyu.css" rel="stylesheet">
+
+    <!-- Prefetch Error QR -->
+    <link rel="prefetch" href="/dist/assets/support_qr.png" as="image">
+    <link rel="prefetch" href="/config.json" as="fetch">
+
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-900">
+    <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div class="sm:mx-auto sm:w-full sm:max-w-md">
+            <!-- Logo/Header -->
+            <div class="mx-auto h-12 w-12 flex items-center justify-center bg-blue-600 dark:bg-blue-500 rounded-lg">
+                <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+            </div>
+            <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Sign in to your account
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+                Access the door entry system
+            </p>
+        </div>
+
+        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+            <div class="bg-white dark:bg-gray-800 px-4 py-8 shadow sm:rounded-lg sm:px-10">
+                <form class="space-y-6" action="/auth/login" method="POST">
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Email address
+                        </label>
+                        <div class="mt-1">
+                            <input 
+                                id="email" 
+                                name="email" 
+                                type="email" 
+                                autocomplete="email" 
+                                required 
+                                class="block w-full appearance-none rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                                placeholder="Enter your email"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <button 
+                            type="submit" 
+                            class="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        >
+                            Send login link
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Status messages -->
+                <div id="message" class="mt-4 hidden">
+                    <div class="rounded-md bg-green-50 dark:bg-green-900/20 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-green-800 dark:text-green-200">
+                                    Check your email for a login link
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error message -->
+                <div id="error" class="mt-4 hidden">
+                    <div class="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-red-800 dark:text-red-200">
+                                    Failed to send login link. Please try again.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Handle form submission
+        document.querySelector('form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = this.querySelector('button[type="submit"]');
+            const email = this.querySelector('#email').value;
+            const messageDiv = document.getElementById('message');
+            const errorDiv = document.getElementById('error');
+            
+            // Hide previous messages
+            messageDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            
+            // Disable button and show loading state
+            button.disabled = true;
+            button.textContent = 'Sending...';
+            
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `email=${encodeURIComponent(email)}`
+                });
+                
+                if (response.ok) {
+                    messageDiv.classList.remove('hidden');
+                } else {
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorDiv.classList.remove('hidden');
+            } finally {
+                // Reset button
+                button.disabled = false;
+                button.textContent = 'Send login link';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -136,5 +136,9 @@ func HTTPServer() *gin.Engine {
 	auth_rg := r.Group("/auth")
 	routes.AuthRoutes(auth_rg)
 
+	// Email login routes
+	email_rg := auth_rg.Group("/email")
+	routes.EmailLoginRoute(email_rg)
+
 	return r
 }
