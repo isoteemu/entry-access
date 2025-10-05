@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+
+	"entry-access-control/internal/email"
 )
 
 const DEFAULT_SUPPORT_URL = "https://github.com/isoteemu/entry-access"
@@ -26,6 +28,9 @@ type Config struct {
 	UserAuthTTL uint `mapstructure:"user_auth_ttl"`
 
 	SupportURL string `mapstructure:"support_url"`
+
+	// Email login configuration
+	Email *email.SMTPConfig `mapstructure:"email"`
 }
 
 var Cfg *Config
@@ -45,6 +50,13 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("USER_AUTH_TTL", 8) // 8 days
 
 	viper.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
+
+	// Email defaults
+	viper.SetDefault("EMAIL_HOST", "host.docker.internal")
+	viper.SetDefault("EMAIL_PORT", "25")
+	viper.SetDefault("EMAIL_USERNAME", "")
+	viper.SetDefault("EMAIL_PASSWORD", "")
+	viper.SetDefault("EMAIL_FROM", "noreply@example.com")
 
 	// Load configuration from environment variables
 	viper.AutomaticEnv()
