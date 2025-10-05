@@ -29,10 +29,10 @@ $(DIST_DIR)/assets/fonts: $(DIST_DIR)
 	$(DOWNLOAD_CMD) $(DIST_DIR)/assets/fonts/Lato-Bold.ttf $(FONT_BASE_URL)/Lato/Lato-Bold.ttf
 
 # Compile CSS with Tailwind
-$(DIST_DIR)/assets/css/output.css: assets/css/input.css $(DIST_DIR)
+$(DIST_DIR)/assets/css/output.css: web/assets/css/input.css $(DIST_DIR)
 	@echo "Compiling CSS with Tailwind"
 	mkdir -p $(DIST_DIR)/assets/css
-	tailwindcss -i ./assets/css/input.css -o $(DIST_DIR)/assets/css/output.css
+	tailwindcss -i ./web/assets/css/input.css -o $(DIST_DIR)/assets/css/output.css
 
 # Target to download emoji data
 download-emoji-spec: $(DIST_DIR)/assets/sas-emoji.json

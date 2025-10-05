@@ -26,11 +26,13 @@ RUN set -eux; \
 
 #COPY templates ./templates
 COPY Makefile ./
-COPY assets ./assets
+COPY web/ ./web
 
 RUN make assets DIST_DIR="${DIST_DIR}"
 
 FROM golang:${GO_VERSION}-${DEBIAN_VERSION} AS builder
+
+ARG DIST_DIR
 
 # Create and change to the app directory.
 WORKDIR /app
