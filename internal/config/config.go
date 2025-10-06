@@ -22,7 +22,10 @@ type Config struct {
 	TokenExpirySkew uint   `mapstructure:"token_expiry_skew"`
 	NonceStore      string `mapstructure:"nonce_store"`
 	LogLevel        string `mapstructure:"log_level"`
-	AllowedNetworks string `mapstructure:"allowed_networks"`
+
+	// Comma separated list of allowed CIDR networks. Empty means allow all.
+	AllowedNetworks  string `mapstructure:"allowed_networks"`
+	AccessListFolder string `mapstructure:"access_list_folder"` // Folder for access list CSVs
 
 	// User authentication TTL in days.
 	UserAuthTTL uint `mapstructure:"user_auth_ttl"`
@@ -34,6 +37,14 @@ type Config struct {
 }
 
 var Cfg *Config
+
+// Check if running in Docker container by checking for the presence of /.dockerenv file
+func runningInDocker() bool {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	return false
+}
 
 // LoadConfig reads configuration from environment variables and returns a Config struct.
 func LoadConfig() (*Config, error) {
@@ -50,6 +61,21 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("USER_AUTH_TTL", 8) // 8 days
 
 	viper.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
+
+	var accessListFolder string
+	// If running in Docker, use /app/instance, otherwise use ./instance relative to cwd
+	if runningInDocker() {
+		accessListFolder = "/app/instance/"
+	} else {
+		// Default folder for access lists
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("unable to get current working directory: %v", err)
+		}
+		accessListFolder = fmt.Sprintf("%s/instance/", cwd)
+	}
+
+	viper.SetDefault("ACCESS_LIST_FOLDER", accessListFolder) // Default folder for access lists
 
 	// Email defaults
 	viper.SetDefault("EMAIL_HOST", "host.docker.internal")
