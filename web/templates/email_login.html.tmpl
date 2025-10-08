@@ -330,7 +330,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             if (location.hash === '#OTP') {
                 otpDiv.classList.remove('hidden');
-                location.hash = '';
                 document.getElementById('otp').focus();
             } else {
                 document.getElementById('email').focus();
