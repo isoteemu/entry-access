@@ -31,20 +31,20 @@ type CSVListDefinition struct {
 // Note: The actual values should be filled in according to the specific CSV formats used. Funidata might change these nillywilly
 var CSVListDefinitions = []CSVListDefinition{
 	// English student list definition
-	CSVListDefinition{
+	{
 		EmailField:   "PRIMARY E-MAIL",
 		StatusField:  "STUDY RIGHT STATUS",
 		ActiveStatus: "Active - Attending",
 		Language:     "en",
 	},
-
 	// Finnish student list definition
-	CSVListDefinition{
+	{
 		EmailField:   "ENSISIJAINEN SÄHKÖPOSTI",
 		StatusField:  "ILMOITTAUTUMISEN TILA",
 		ActiveStatus: "Vahvistettu",
 		Language:     "fi",
 	},
+	// Missing: Swedish student list definition
 }
 
 type EntryRecord interface {
@@ -115,7 +115,6 @@ func (s *CSVAccessList) Find(EntryID string) (EntryRecord, error) {
 
 			for i, field := range record {
 				if i == reader.HeaderMap[reader.FieldDefinitions.EmailField] {
-
 					// Compare case-insensitively
 					if strings.EqualFold(strings.TrimSpace(field), strings.TrimSpace(EntryID)) {
 						// Found the entry, check status if applicable
