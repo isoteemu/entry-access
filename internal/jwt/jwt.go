@@ -1,4 +1,4 @@
-package app
+package jwt
 
 import (
 	"context"
@@ -105,6 +105,40 @@ func mustCreateRegisteredClaim(ttl uint) jwt.RegisteredClaims {
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 		ExpiresAt: jwtExpiry(ttl),
 	}
+}
+
+// Claim when user is requesting access code
+type AccessCodeClaim struct {
+	Verify  string `json:"verify"`
+	Email   string `json:"email"`
+	EntryID string `json:"entry_id"`
+	jwt.RegisteredClaims
+}
+
+func NewAccessCodeClaim(otpVerify string, email string, entryId string, ttl uint) AccessCodeClaim {
+	return AccessCodeClaim{
+		Verify:           otpVerify,
+		Email:            email,
+		EntryID:          entryId,
+		RegisteredClaims: mustCreateRegisteredClaim(ttl),
+	}
+}
+
+func DecodeAccessCodeJWT(tokenString string) (*AccessCodeClaim, error) {
+
+	claims, err := decodeJWT(tokenString, &AccessCodeClaim{})
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	// Consume nonce to prevent replay attacks
+	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
+		if err != nil {
+			return nil, err
+		}
+		return nil, ErrInvalidNonce
+	}
+	return claims, nil
 }
 
 func consumeClaimNonce(claims *jwt.RegisteredClaims) error {

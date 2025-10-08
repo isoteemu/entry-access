@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full bg-gray-50  dark:bg-gray-900">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,26 +13,35 @@
     <link rel="prefetch" href="/config.json" as="fetch">
 
 </head>
-<body class="h-full bg-gray-50 dark:bg-gray-900">
+<body class="h-full">
     <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div class="sm:mx-auto sm:w-full sm:max-w-md">
             <!-- Logo/Header -->
-            <div class="mx-auto h-12 w-12 flex items-center justify-center bg-blue-600 dark:bg-blue-500 rounded-lg">
-                <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                </svg>
+            <div class="flex items-center gap-4 mb-2">
+                <div class="h-12 w-12 flex items-center justify-center bg-blue-600 dark:bg-blue-500 rounded-lg">
+                    <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex-1 text-center">
+                    Identify with email
+                </h2>
             </div>
-            <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Sign in to your account
-            </h2>
             <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-                Access the door entry system
+                To access the premises, please enter your student email address. A login link will be sent to your email.
             </p>
         </div>
 
         <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
             <div class="bg-white dark:bg-gray-800 px-4 py-8 shadow sm:rounded-lg sm:px-10">
-                <form class="space-y-6" action="/auth/login" method="POST">
+                <!-- Step indicator -->
+                <div class="flex items-center mb-6">
+                    <div class="flex items-center justify-center h-8 w-8 rounded-full bg-blue-600 text-white font-bold mr-3">
+                        1
+                    </div>
+                    <h3 class="text-base font-medium text-gray-900 dark:text-white">Enter your student email</h3>
+                </div>
+                <form class="space-y-6" action="" method="POST" id="email-form">
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             Email address
@@ -53,14 +62,14 @@
                     <div>
                         <button 
                             type="submit" 
-                            class="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            class="flex w-full justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             Send login link
                         </button>
                     </div>
                 </form>
 
-                <!-- Status messages -->
+                <!-- Email Status messages -->
                 <div id="message" class="mt-4 hidden">
                     <div class="rounded-md bg-green-50 dark:bg-green-900/20 p-4">
                         <div class="flex">
@@ -71,11 +80,52 @@
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-green-800 dark:text-green-200">
-                                    Check your email for a login link
+                                    Check your email for a login link. If you don't see it, please check your spam folder. The link will expire in {{.LinkTTL}} minutes.
                                 </p>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div id="OTP" class="{{ if not .OTPClaim}}hidden{{end}} mt-6">
+                    <div id="hr" class="mt-6 border-t border-gray-200 dark:border-gray-700"></div>
+                    <a name="OTP" class="hidden">OTP Verification</a>
+                    <div class="flex items-center mt-6 mb-4">
+                        <div class="flex items-center justify-center h-8 w-8 rounded-full bg-blue-600 text-white font-bold mr-3">
+                            2
+                        </div>
+                        <h3 class="text-base font-medium text-gray-900 dark:text-white">Check your email</h3>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        You can click the login link sent to your email and ignore this page, or you can fill out here the authentication code included in the email.
+                    </p>
+                    <form class="mt-4 flex flex-col items-center" action="verify" method="POST" autocomplete="off" id="otp-form">
+                        <label for="otp" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Enter 6-digit code
+                        </label>
+                        <div class="mt-1">
+                            <input
+                                id="otp"
+                                name="otp"
+                                type="text"
+                                inputmode="numeric"
+                                pattern="[0-9]{6}"
+                                maxlength="6"
+                                minlength="6"
+                                required
+                                class="block w-40 text-center appearance-none rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm tracking-widest"
+                                placeholder="_ _ _ _ _ _"
+                            >
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="mt-3 flex w-40 justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Verify and proceed
+                        </button>
+
+                        <input type="hidden" name="otpclaim" value="{{.OTPClaim}}">
+                    </form>
                 </div>
 
                 <!-- Error message -->
@@ -88,7 +138,7 @@
                                 </svg>
                             </div>
                             <div class="ml-3">
-                                <p class="text-sm font-medium text-red-800 dark:text-red-200">
+                                <p class="text-sm font-medium text-red-800 dark:text-red-200" id="error-message">
                                     Failed to send login link. Please try again.
                                 </p>
                             </div>
@@ -101,42 +151,189 @@
 
     <script>
         // Handle form submission
-        document.querySelector('form').addEventListener('submit', async function(e) {
+        const errorDiv = document.getElementById('error');
+        const errorMsg = errorDiv.querySelector('#error-message');
+        const otpDiv = document.getElementById('OTP');
+
+        const 
+            resendText = "Resend email",
+            sendingText = "Sending...",
+            defaultErrorText =  errorMsg.textContent;
+
+        // document.querySelector('form').addEventListener('submit', async function(e) {
+        document.getElementById('email-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const button = this.querySelector('button[type="submit"]');
             const email = this.querySelector('#email').value;
             const messageDiv = document.getElementById('message');
-            const errorDiv = document.getElementById('error');
             
             // Hide previous messages
             messageDiv.classList.add('hidden');
             errorDiv.classList.add('hidden');
+            // Reset error text
+            errorMsg.textContent = defaultErrorText;
             
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Sending...';
-            
+
+            // Helper to start cooldown
+            function startCooldown() {
+                let seconds = 45;
+                button.disabled = true;
+                const originalText = 'Send login link';
+                const interval = setInterval(() => {
+                    button.textContent = `Wait ${seconds--}s...`;
+                    if (seconds <= 0) {
+                        clearInterval(interval);
+                        button.disabled = false;
+                        button.textContent = resendText;
+                    }
+                }, 1000);
+            }
+
             try {
-                const response = await fetch('/auth/login', {
+                const formTarget = this.action;
+
+                const postData = {
+                    email: email,
+                };
+                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (timeZone) {
+                    postData.timezone = timeZone;
+                }
+
+                const response = await fetch(formTarget, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: `email=${encodeURIComponent(email)}`
+                    body: new URLSearchParams(postData),
                 });
-                
+
                 if (response.ok) {
+                    // A-OK, start cooldown and show OTP section
                     messageDiv.classList.remove('hidden');
+                    otpDiv.classList.remove('hidden');
+                    startCooldown();
+
+                    // Set otpclaim value if provided
+                    const data = await response.json();
+                    if (data && data.otpclaim) {
+                        document.querySelector('input[name="otpclaim"]').value = data.otpclaim;
+                        document.getElementById('otp').focus();
+                    } else {
+                        // Should not happen!
+                        throw new Error("No otpclaim received");
+                    }
+
+                    location.hash = '#OTP';
                 } else {
+                    // Try to parse JSON error
+                    let customError = null;
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        try {
+                            const data = await response.json();
+                            if (data && data.error) {
+                                customError = data.error;
+                            }
+                        } catch (_) {}
+                    }
+                    if (customError) {
+                        errorMsg.textContent = customError;
+                    }
                     errorDiv.classList.remove('hidden');
+                    button.disabled = false;
+                    button.textContent = 'Send login link';
                 }
             } catch (error) {
                 errorDiv.classList.remove('hidden');
-            } finally {
-                // Reset button
                 button.disabled = false;
                 button.textContent = 'Send login link';
+            }
+        });
+
+        document.getElementById('otp-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = this.querySelector('button[type="submit"]');
+            const otpInput = this.querySelector('#otp');
+            const otp = otpInput.value;
+
+            // Hide previous error on change
+            otpInput.addEventListener('input', () => {
+                otpInput.setCustomValidity('');
+            });
+
+            // Disable button to prevent multiple submissions - not that important here but just in case
+            button.disabled = true;
+
+            try {
+                const formTarget = this.action;
+                const otpclaim = this.querySelector('input[name="otpclaim"]').value;
+
+                const postData = {
+                    otp: otp,
+                    otpclaim: otpclaim,
+                };
+
+                const response = await fetch(formTarget, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(postData),
+                });
+
+                if (response.ok) {
+                    // Success - should redirect automatically
+                    const data = await response.json();
+                    if (data && data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        // Should not happen!
+                        throw new Error("No redirect URL received");
+                    }
+                } else {
+                    // Try to parse JSON error
+                    let customError = null;
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        try {
+                            const data = await response.json();
+                            console.log("OTP error response data:", data);
+                            if (data && data.error) {
+                                customError = data.error;
+                            }
+                        } catch (_) {}
+                    }
+
+                    if (!customError) {
+                        // Fallback to default error message
+                        customError = "Failed to verify OTP. Please try again.";
+                    }
+                    if (customError) {
+                        otpInput.setCustomValidity(customError);
+                        otpInput.reportValidity();
+                    }
+
+                    button.disabled = false;
+                }
+            } catch (error) {
+                console.error("Error submitting OTP form:", error);
+            }
+        });
+
+        // When page loads, check the hash to see if we should show OTP section
+        document.addEventListener('DOMContentLoaded', function() {
+            if (location.hash === '#OTP') {
+                otpDiv.classList.remove('hidden');
+                location.hash = '';
+                document.getElementById('otp').focus();
+            } else {
+                document.getElementById('email').focus();
             }
         });
     </script>
