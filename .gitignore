@@ -33,4 +33,4 @@ go.work.sum
 
 # --- Project specific ---
 dist/
-
+instance/**
