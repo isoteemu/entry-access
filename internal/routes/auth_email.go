@@ -90,6 +90,13 @@ func generateOTP() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
+// Login user by renewing auth cookie and consuming the claim nonce
+func login(c *gin.Context, claim jwt.AccessCodeClaim) {
+	slog.Info("User logged in via email verification", "email", claim.Email)
+	renewAuth(c, claim.Email, true)
+	jwt.ConsumeClaimNonce(&claim.RegisteredClaims)
+}
+
 func EmailLoginRoute(r *gin.RouterGroup) {
 
 	r.GET("/login", func(c *gin.Context) {
@@ -265,7 +272,10 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		// Quote the entry ID for URL
 		entry_url := template.URLQueryEscaper(emailClaim.EntryID)
 
+		login(c, *emailClaim)
+
 		c.JSON(200, gin.H{
+			"status":   "success",
 			"message":  "OTP verification successful",
 			"redirect": UrlFor(c, "/entry/"+entry_url),
 		})
@@ -284,7 +294,22 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		// Verify the token and log the user in
 		// TODO
 
-		renewAuth(c, "user-id-from-token", true) // Replace with actual user ID from token
+		emailClaim, err := jwt.DecodeAccessCodeJWT(token)
+		if err != nil {
+			if err == jwt.ErrInvalidNonce {
+				slog.Info("Email verification token has been used", "error", err, "ip", c.ClientIP())
+				c.HTML(400, "email_login.html.tmpl", gin.H{"error": "Link has been already been used. Please request a new login link."})
+				return
+			} else {
+				slog.Warn("Failed to decode email verification token", "error", err, "ip", c.ClientIP())
+				c.HTML(400, "email_login.html.tmpl", gin.H{"error": "Failed to decode token. Please request a new login link."})
+			}
+			return
+		}
+
+		slog.Info("User logged in via email link", "email", emailClaim.Email)
+
+		login(c, *emailClaim)
 
 		// On success, redirect to entryway page
 	})

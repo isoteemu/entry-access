@@ -125,23 +125,26 @@ func NewAccessCodeClaim(otpVerify string, email string, entryId string, ttl uint
 }
 
 func DecodeAccessCodeJWT(tokenString string) (*AccessCodeClaim, error) {
-
 	claims, err := decodeJWT(tokenString, &AccessCodeClaim{})
 	if err != nil {
 		return nil, err
 	}
-	ctx := context.Background()
-	// Consume nonce to prevent replay attacks
-	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
-		if err != nil {
-			return nil, err
-		}
-		return nil, ErrInvalidNonce
-	}
+
+	// TODO: Do not consume the nonce until entry has been verified
+	// This is to allow the user to retry OTP verification if they fail
+	// the first time.
+	// ctx := context.Background()
+	// // Consume nonce to prevent replay attacks
+	// if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return nil, ErrInvalidNonce
+	// }
 	return claims, nil
 }
 
-func consumeClaimNonce(claims *jwt.RegisteredClaims) error {
+func ConsumeClaimNonce(claims *jwt.RegisteredClaims) error {
 	ctx := context.Background()
 	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
 		if err != nil {
