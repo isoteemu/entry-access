@@ -4,10 +4,12 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"log/slog"
 	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -69,7 +71,7 @@ func otpEncode(data string, key string) string {
 
 	h := hmac.New(sha256.New, derivedKey)
 	h.Write([]byte(data))
-	key = string(h.Sum(nil))
+	key = base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return key
 }
 
@@ -160,9 +162,9 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		// Collect necessary info for email
 		data := emailLoginLink{
-			EntryName:  "Ag C331", // TODO: Get actual entry name
-			Link:       link,      // Use the generated link
-			EntryCode:  otp,
+			EntryName:  entryId, // TODO: Get actual entry name
+			Link:       link,
+			EntryCode:  otp, // text version of the OTP
 			Expires:    expires,
 			LinkTTL:    LINK_TTL.Minutes(),
 			IP:         c.ClientIP(),
@@ -190,14 +192,21 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			Subject: emailTitle,
 			HTML:    emailMsg,
 		}
-		err = client.Send(msg)
-		if err != nil {
-			slog.Error("Failed to send email", "error", err, "to", emailAddr)
-			loginErr(c, 500, "Internal server error: failed to send email")
-			return
-		}
 
-		slog.Info("Sent login link email", "to", emailAddr)
+		if emailAddr == "user@example.com" && os.Getenv("GIN_MODE") != "release" {
+			// In debug mode, skip sending email for the example address
+			slog.Debug("Debug mode: skipping email send", "to", emailAddr, "subject", emailTitle, "body", emailMsg)
+			slog.Info("Use the following OTP code to login", "otp", otp)
+		} else {
+			err = client.Send(msg)
+			if err != nil {
+				slog.Error("Failed to send email", "error", err, "to", emailAddr)
+				loginErr(c, 500, "Internal server error: failed to send email")
+				return
+			}
+
+			slog.Info("Sent login link email", "to", emailAddr)
+		}
 
 		// Return token for OTP validation
 		c.JSON(200, gin.H{
@@ -221,7 +230,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			loginErr(c, 400, "Invalid OTP code format")
 			return
 		}
-		claim := c.PostForm("claim")
+		claim := c.PostForm("otpclaim")
 		if claim == "" {
 			slog.Warn("OTP claim is missing")
 			loginErr(c, 400, "OTP Claim is required")
@@ -229,10 +238,17 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		}
 
 		// Decode claim
+		// TODO: Do not consume the claim until OTP is verified
 		emailClaim, err := jwt.DecodeAccessCodeJWT(claim)
 		if err != nil {
-			slog.Warn("Failed to decode OTP claim", "error", err)
-			c.HTML(400, "email_login.html.tmpl", gin.H{"error": "Invalid or expired code"})
+			if err == jwt.ErrInvalidNonce {
+				slog.Info("OTP claim token has been used", "error", err)
+				loginErr(c, 400, "Code has been already been used. Please request a new login link.")
+				return
+			} else {
+				slog.Warn("Failed to decode OTP claim", "error", err)
+				loginErr(c, 400, "Failed to decode OTP claim.")
+			}
 			return
 		}
 
@@ -240,7 +256,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		expected := emailClaim.Verify
 		if !otpVerify(otp, Cfg.Secret, expected) {
 			slog.Info("OTP code is invalid", "otp", otp)
-			loginErr(c, 400, "Invalid OTP code")
+			loginErr(c, 400, "Invalid OTP code. Please check and try again.")
 			return
 		}
 
