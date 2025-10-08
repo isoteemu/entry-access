@@ -20,7 +20,6 @@ func securityHeaders(c *gin.Context) {
 	c.Header("X-Frame-Options", "DENY")
 	c.Header("X-XSS-Protection", "1; mode=block")
 
-	// CORS: allow all
 	// Disable caching
 	c.Header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
 	c.Header("Pragma", "no-cache")
@@ -91,6 +90,15 @@ func HTTPServer() *gin.Engine {
 		r.Use(IPAccessControl(allowedCIDRs))
 	}
 	r.Use(securityHeaders)
+
+	// Inject the HTML renderer into the context for access in handlers
+	// This allows rendering templates in sub-packages
+	// without passing the renderer explicitly
+	// See: RenderTemplate in utils/http.go
+	r.Use(func(c *gin.Context) {
+		c.Set("HTML", r.HTMLRender)
+		c.Next()
+	})
 
 	r.GET("/ping", func(c *gin.Context) {
 		msg := c.Query("ping")

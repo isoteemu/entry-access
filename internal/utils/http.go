@@ -3,10 +3,10 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/render"
 )
 
 // Helper function to generate a URL for a given path
@@ -38,10 +38,12 @@ func GetBaseURL(c *gin.Context, configBaseURL string) string {
 	return fmt.Sprintf("%s://%s", scheme, c.Request.Host)
 }
 
+// RenderTemplate renders a template with the given name and data, returning the result as a string.
 func RenderTemplate(c *gin.Context, tmplName string, data any) (string, error) {
 	var buf bytes.Buffer
-	tmpl := c.MustGet("html").(*template.Template)
-	err := tmpl.ExecuteTemplate(&buf, tmplName, data)
+	// Get the template engine from Gin context
+	tmpl := c.MustGet("HTML").(render.HTMLRender)
+	err := tmpl.Instance(tmplName, data).(render.HTML).Template.ExecuteTemplate(&buf, tmplName, data)
 	if err != nil {
 		return "", err
 	}
