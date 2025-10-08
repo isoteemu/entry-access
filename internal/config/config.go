@@ -27,13 +27,15 @@ type Config struct {
 	AllowedNetworks  string `mapstructure:"allowed_networks"`
 	AccessListFolder string `mapstructure:"access_list_folder"` // Folder for access list CSVs
 
+	Admins []string `mapstructure:"admins"` // List of admin emails
+
 	// User authentication TTL in days.
 	UserAuthTTL uint `mapstructure:"user_auth_ttl"`
 
 	SupportURL string `mapstructure:"support_url"`
 
 	// Email login configuration
-	Email *email.SMTPConfig `mapstructure:"email"`
+	Email email.SMTPConfig `mapstructure:",squash"`
 }
 
 var Cfg *Config
@@ -57,6 +59,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("NONCE_STORE", "memory")
 	viper.SetDefault("ALLOWED_NETWORKS", "")
+
+	// TODO: Testing, remove default in production
+	viper.SetDefault("ADMINS", []string{})
 
 	viper.SetDefault("USER_AUTH_TTL", 8) // 8 days
 

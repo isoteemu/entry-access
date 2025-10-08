@@ -37,16 +37,16 @@ import (
 
 // SMTPConfig represents an email client configuration
 type SMTPConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     string `mapstructure:"port"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	From     string `mapstructure:"from"`
+	Host     string `mapstructure:"email_host"`
+	Port     string `mapstructure:"email_port"`
+	Username string `mapstructure:"email_username"`
+	Password string `mapstructure:"email_password"`
+	From     string `mapstructure:"email_from"`
 }
 
 // EmailClient represents an email client
 type EmailClient struct {
-	cfg    *SMTPConfig
+	cfg    SMTPConfig
 	client *mail.Client
 }
 
@@ -59,7 +59,9 @@ type Message struct {
 }
 
 // NewClient creates a new email client
-func NewClient(cfg *SMTPConfig) (*EmailClient, error) {
+func NewClient(cfg SMTPConfig) (*EmailClient, error) {
+	slog.Info("Creating email client", "host", cfg.Host, "port", cfg.Port, "username", cfg.Username, "from", cfg.From)
+
 	portInt, err := strconv.Atoi(cfg.Port)
 	if err != nil {
 		return nil, fmt.Errorf("invalid port number: %w", err)
@@ -69,7 +71,7 @@ func NewClient(cfg *SMTPConfig) (*EmailClient, error) {
 		mail.WithPort(portInt),
 		mail.WithUsername(cfg.Username),
 		mail.WithPassword(cfg.Password),
-		// mail.WithSMTPAuth(mail.SMTPAuthPlain),
+		mail.WithSMTPAuth(mail.SMTPAuthPlain),
 		// mail.WithTLSPolicy(mail.TLSMandatory),
 	)
 	if err != nil {
