@@ -43,7 +43,7 @@ func getEntryToken(entryID string) (string, error) {
 		// Validate that the token is not expired
 		parts := strings.Split(token, ".")
 		if len(parts) != 3 {
-			slog.Debug("Invalid token format", "token", token)
+			slog.Debug("Invalid token format, expected 3 parts", "token", token)
 			return "", fmt.Errorf("invalid token format")
 		}
 		// Validate the token (assuming the token is a JWT)
@@ -93,7 +93,9 @@ func EntryRoute(r *gin.RouterGroup) {
 			return
 		}
 
+		// TODO: Extract from device provisioning data
 		token, err := getEntryToken("entry1")
+
 		if err != nil {
 			slog.Debug("Error getting entry token", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting entry token"})
