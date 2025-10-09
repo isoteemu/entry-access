@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const authCookieName = "auth_token"
+const AUTH_COOKIE_NAME = "auth_token"
 
 const AUTH_FAIL_STATUS = 401 // HTTP status code for authentication failure
 
@@ -34,7 +34,7 @@ func setAuthCookie(c *gin.Context, token string) {
 	// Convert to int for SetCookie
 
 	c.SetCookie(
-		authCookieName,
+		AUTH_COOKIE_NAME,
 		token,
 		int(ttl),
 		"/",
@@ -58,7 +58,7 @@ func NewAuth(c *gin.Context, userId string) error {
 
 func verifyAuth(c *gin.Context) (string, error) {
 	// Get auth token from cookie
-	token, err := c.Cookie(authCookieName)
+	token, err := c.Cookie(AUTH_COOKIE_NAME)
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +73,7 @@ func verifyAuth(c *gin.Context) (string, error) {
 func renewAuth(c *gin.Context, userId string, forceRenew bool) error {
 
 	// Fetch old token to invalidate it
-	oldToken, err := c.Cookie(authCookieName)
+	oldToken, err := c.Cookie(AUTH_COOKIE_NAME)
 	if err == nil {
 		// Decode old token to get its ID
 		oldClaims, err := DecodeAuthJWT(oldToken)
@@ -88,9 +88,15 @@ func renewAuth(c *gin.Context, userId string, forceRenew bool) error {
 				return nil
 			}
 
+			// If MustRenew is set, we must renew the token
+			if oldClaims.MustRenew {
+				slog.Debug("renewAuth: Token marked for mandatory renewal", "userID", userId)
+				forceRenew = true
+			}
+
 			renewAge := time.Duration(authTTL()/2) * time.Second
 			if forceRenew || time.Until(expiration) < renewAge {
-				slog.Info("Renewing auth token for user", "userID", userId)
+				slog.Debug("Renewing auth token for user", "userID", userId)
 
 				// Invalidate old token by consuming its nonce
 				NonceStore.Consume(c.Request.Context(), nonce)
@@ -112,6 +118,32 @@ func renewAuth(c *gin.Context, userId string, forceRenew bool) error {
 	// Create new auth token
 	NewAuth(c, userId)
 	return nil
+}
+
+func AuthLogout(c *gin.Context) {
+
+	// Consume the nonce to invalidate the token
+	token, err := c.Cookie(AUTH_COOKIE_NAME)
+
+	if err != nil {
+		slog.Warn("AuthLogout: No auth token found to consume nonce", "error", err)
+	} else {
+		claims, err := DecodeAuthJWT(token)
+		if err == nil {
+			NonceStore.Consume(c.Request.Context(), claims.ID)
+		}
+	}
+
+	// Clear auth cookie by setting it to expire in the past
+	c.SetCookie(
+		AUTH_COOKIE_NAME,
+		"",
+		-1,
+		"/",
+		"",
+		false,
+		true,
+	)
 }
 
 func AuthMiddleware() gin.HandlerFunc {
@@ -160,5 +192,10 @@ func AuthRoutes(r *gin.RouterGroup) {
 	r.GET("/status", AuthMiddleware(), func(c *gin.Context) {
 		// If we reach here, the token is valid
 		c.JSON(200, gin.H{"status": "authenticated", "userID": c.GetString("userID")})
+	})
+
+	r.POST("/logout", AuthMiddleware(), func(c *gin.Context) {
+		AuthLogout(c)
+		c.Redirect(303, "/")
 	})
 }

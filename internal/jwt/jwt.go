@@ -54,6 +54,8 @@ func DecodeEntryJWT(tokenString string) (*EntryClaim, error) {
 // AuthClaims represents the expected claims in the JWT token
 type AuthClaims struct {
 	UserID string `json:"uid"`
+	// Must renew indicates if the token must be renewed. It will trigger nonce consumption.
+	MustRenew bool `json:"renew,omitempty"`
 	// Add other fields as necessary
 	jwt.RegisteredClaims
 }
