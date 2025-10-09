@@ -51,6 +51,8 @@ type NonceStoreInterface interface {
 	// verifies and deletes the nonce.
 	// Returns true if the nonce existed (valid request), false otherwise.
 	Consume(ctx context.Context, nonce string) (bool, error)
+
+	Exists(ctx context.Context, nonce string) bool
 }
 
 func generateNonceToken() (string, error) {
@@ -148,6 +150,19 @@ func (m *MemoryStore) Consume(ctx context.Context, nonce string) (bool, error) {
 	}
 	delete(m.entries, nonce)
 	return true, nil
+}
+
+func (m *MemoryStore) Exists(ctx context.Context, nonce string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exp, ok := m.entries[nonce]
+	if !ok {
+		return false
+	}
+	if time.Now().After(exp) {
+		return false
+	}
+	return true
 }
 
 // janitor runs every second (configurable) and purges expired keys.
