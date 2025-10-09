@@ -5,10 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -26,6 +29,10 @@ import (
 // TODO: Get actual entry ID
 const ENTRY_ID = "Ag C331"
 
+// If not runninng in production, use this test user to skip email sending
+// and just print the OTP code to the log.
+const TEST_USER = "user@example.com"
+
 // var authFailures = prometheus.NewCounter(prometheus.CounterOpts{
 // 	Name: "auth_failures_total",
 // 	Help: "Total number of authentication failures",
@@ -38,11 +45,6 @@ const EMAIL_TITLE = "Access code for %s"
 // Salt for SAS key derivation. Used to prevent rainbow table attacks.
 const SAS_KEY_SALT = "Ð¥ðVwj¯xR¨Øò\"9îzE5B:ëø1K*,EöþJjM"
 
-type loginForm struct {
-	Email string `form:"email" binding:"required,email"`
-	Claim string `form:"claim" binding:"required"`
-}
-
 type emailLoginLink struct {
 	EntryName  string  // Name of the entry point (e.g., Ag C331)
 	Link       string  // The actual login link URL
@@ -52,6 +54,8 @@ type emailLoginLink struct {
 	IP         string  // IP address of the user
 	IPLocation string  // Location of the user
 }
+
+var emailLoginVerifyStore NonceStoreInterface
 
 func loginErr(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{"error": message})
@@ -98,6 +102,12 @@ func login(c *gin.Context, claim jwt.AccessCodeClaim) {
 }
 
 func EmailLoginRoute(r *gin.RouterGroup) {
+
+	emailLoginVerifyStore, err := NewStore(Cfg)
+	if err != nil {
+		slog.Error("Failed to create email login verify store", "error", err)
+		panic("Failed to create email login verify store")
+	}
 
 	r.GET("/login", func(c *gin.Context) {
 		// Collect necessary info for email
@@ -200,10 +210,10 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			HTML:    emailMsg,
 		}
 
-		if emailAddr == "user@example.com" && os.Getenv("GIN_MODE") != "release" {
+		if emailAddr == TEST_USER && os.Getenv("GIN_MODE") != "release" {
 			// In debug mode, skip sending email for the example address
 			slog.Debug("Debug mode: skipping email send", "to", emailAddr, "subject", emailTitle, "body", emailMsg)
-			slog.Info("Use the following OTP code to login", "otp", otp)
+			slog.Info("Use the following OTP code to login", "otp", otp, "link", link)
 		} else {
 			err = client.Send(msg)
 			if err != nil {
@@ -219,7 +229,108 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		c.JSON(200, gin.H{
 			"message":  "Login link sent",
 			"otpclaim": token,
+			"id":       claim.ID, // It could be extracted from the token, but this is more explicit
 		})
+
+	})
+
+	// Check if the user has clicked the link or submitted the OTP code
+	r.GET("/status/:token", func(c *gin.Context) {
+
+		userID, err := verifyAuth(c)
+		if err == nil && userID != "" {
+			// Already authenticated, redirect to entryway page
+			c.JSON(200, gin.H{
+				"status": "authenticated",
+			})
+			return
+		}
+
+		// Decode JWT token from URL parameter
+		token := c.Param("token")
+		if token == "" {
+			slog.Warn("Email status check token is missing", "token", token)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+			return
+		}
+
+		claim, err := jwt.DecodeAccessCodeJWT(token)
+		if err != nil {
+			slog.Warn("Failed to decode email status check token", "error", err, "ip", c.ClientIP())
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to decode token. Please request a new login link."})
+			return
+		}
+
+		// Not authenticated, start SSE to wait for OTP verification
+		// Set SSE headers
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Header().Set("Transfer-Encoding", "chunked") // Important for streaming
+
+		c.Writer.WriteHeader(http.StatusOK)
+
+		// Ensure the connection is closed when the client disconnects
+		clientGone := c.Request.Context().Done()
+
+		// Start the event loop
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// Format the data according to SSE specification
+				// Data must start with 'data: ' and end with '\n\n'
+				// We are sending a JSON string for the status
+
+				var data = gin.H{
+					"status": "pending",
+				}
+				// Check if the user has verified the OTP by looking up the nonce store
+				// If verified, set status to "authenticated"
+
+				userID, err := verifyAuth(c)
+				if err == nil && userID != "" {
+					data["status"] = "authenticated"
+					// No need to redirect to actual entryway page, email link has done that
+					data["redirect"] = UrlFor(c, "/entry/success")
+				}
+
+				// Check if the OTP claim ID has been marked as verified
+				if emailLoginVerifyStore.Exists(c.Request.Context(), claim.ID) {
+					data["status"] = "authenticated"
+					// No need to redirect to actual entryway page, email link has done that
+					data["redirect"] = UrlFor(c, "/entry/success")
+				}
+
+				eventData, err := json.Marshal(data)
+				if err != nil {
+					slog.Error("Failed to marshal SSE data", "error", err)
+					return
+				}
+				eventData = append([]byte("data: "), eventData...)
+				eventData = append(eventData, []byte("\n\n")...)
+
+				// Write the event to the response stream
+				_, err = io.WriteString(c.Writer, string(eventData))
+				if err != nil {
+					// Client has likely disconnected
+					slog.Debug("SSE client disconnected", "error", err)
+					return
+				}
+				// Flush the buffer to ensure the data is sent immediately
+				c.Writer.Flush()
+				if data["status"] == "authenticated" {
+					slog.Debug("SSE client authenticated, closing connection")
+					return
+				}
+			case <-clientGone:
+				// Client closed the connection (e.g., closed the tab)
+				slog.Debug("SSE client disconnected")
+				return
+			}
+		}
 
 	})
 
@@ -269,10 +380,14 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		slog.Info("User logged in via email OTP", "email", emailClaim.Email)
 
+		// TODO: generate new EntryWay claim
 		// Quote the entry ID for URL
-		entry_url := template.URLQueryEscaper(emailClaim.EntryID)
+		entry_url := template.URLQueryEscaper("...")
 
 		login(c, *emailClaim)
+
+		// TODO: Redirect to entryway page
+		// Generate new EntryWay claim
 
 		c.JSON(200, gin.H{
 			"status":   "success",
@@ -291,9 +406,6 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			return
 		}
 
-		// Verify the token and log the user in
-		// TODO
-
 		emailClaim, err := jwt.DecodeAccessCodeJWT(token)
 		if err != nil {
 			if err == jwt.ErrInvalidNonce {
@@ -307,9 +419,15 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			return
 		}
 
-		slog.Info("User logged in via email link", "email", emailClaim.Email)
+		slog.Info("User clicked email link", "email", emailClaim.Email)
 
-		login(c, *emailClaim)
+		// Store the ID of the clicked link to allow polling to detect it
+		ttl := time.Duration(emailClaim.ExpiresAt.Unix()-time.Now().UTC().Unix()) * time.Second
+		emailLoginVerifyStore.Put(c.Request.Context(), emailClaim.ID, ttl)
+
+		// TODO: Check the entry attempted to access
+		//  - Redirect to entry page
+		//  - Add user id into SSE polling to auto-login
 
 		// On success, redirect to entryway page
 	})

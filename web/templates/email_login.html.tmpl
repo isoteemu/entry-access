@@ -138,8 +138,49 @@
 
     <script>
 
+    // Setup EventSource for server-sent events (if needed)
+    const url = new URL('verify', window.location);
+    const eventSource = new EventSource(url);
+
+    // 2. Event listener for incoming messages
+    // SSE messages that start with 'data: ' are received here
+    eventSource.onmessage = function(event) {
+        try {
+            // Parse the JSON string sent by the server
+            const data = JSON.parse(event.data);
+            
+            // TODO: Parse error
+
+            console.log("EventSource message received:", data);
+
+            if (data.status === 'authenticated') {
+                statusDisplay.style.color = 'green';
+                
+                eventSource.close();
+                console.log('SSE connection closed by client.');
+            } else if (data.status === 'pending') {
+                statusDisplay.style.color = 'orange';
+            }
+
+        } catch (e) {
+            console.error('Error parsing JSON:', e, 'Raw data:', event.data);
+        }
+    };
+
+    // Optional: Event listener for when the connection is opened
+    eventSource.onopen = function() {
+        console.log('SSE connection established.');
+    };
+
+    // Optional: Event listener for errors (including connection failure/reconnect attempts)
+    eventSource.onerror = function(err) {
+        console.error('EventSource failed:', err);
+        // EventSource automatically attempts to reconnect, so no need to manually handle that here.
+    };
+
+
     // Helper function to perform fetch with timeout
-   function postData(url = '', data = {}, options = {}) {
+    function postData(url = '', data = {}, options = {}) {
         const controller = new AbortController();
 
         const defaultOptions = {
