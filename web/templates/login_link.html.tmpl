@@ -37,14 +37,11 @@
         
         .content {
             padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            min-height: 360px;
         }
-        
-        .greeting {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #333333;
-        }
-        
+
         .login-button {
             display: inline-block;
             background-color: #003366;
@@ -99,6 +96,7 @@
         .auth-code-section {
             margin: 24px 0;
             text-align: center;
+            margin-top: auto;
         }
         
         .auth-code-label {
@@ -119,8 +117,32 @@
             padding: 12px 24px;
             margin-top: 4px;
             font-weight: bold;
+            /* New: provide a gentle uniform spacing fallback for email clients */
+            letter-spacing: 6px;
+            /* Use a monospace basis so spacing looks even */
+            font-variant-numeric: tabular-nums;
         }
         
+        /* New: visual separator to differentiate options */
+        .separator {
+            margin: 18px 0;
+            border: none;
+            border-top: 1px solid #e6e6e6;
+            width: 100%;
+        }
+        
+        /* New: preheader used for email preview/snippet (hidden in full message) */
+        .preheader {
+            font-size: 1px;
+            color: #f5f5f5;
+            line-height: 1px;
+            max-height: 0;
+            max-width: 0;
+            opacity: 0;
+            overflow: hidden;
+            mso-hide: all; /* hide for Outlook */
+        }
+
         @media only screen and (max-width: 600px) {
             .container {
                 width: 100% !important;
@@ -139,27 +161,33 @@
 </head>
 <body>
     <div class="container">
+
+        <!-- Preheader that email clients often show as the preview snippet.
+             It includes the access code for quick preview, but is hidden
+             in the full message by CSS above. -->
+        <div class="preheader" aria-hidden="true">Your access code: {{ .EntryCode }}</div>
+
         <div class="header">
             <h1>Access to {{.EntryName}}</h1>
         </div>
         
         <div class="content">
-            <div class="greeting">
-                Hello,
-            </div>
             <p>You have requested access to {{.EntryName}}. Clicking the button below will allow us to verify your access.</p>
             
             <div style="text-align: center;">
                 <a href="{{.Link}}" class="login-button">Verify access</a>
             </div>
             
-            <div style="text-align: center; margin-top: 10px;">
+            <div style="text-align: center; margin-top: 10px; display: none;">
                 <p style="font-size: 12px; color: #666666; margin: 5px 0;">If the button above doesn't work, copy and paste this link into your browser:</p>
                 <p style="font-size: 12px; color: #003366; word-break: break-all; margin: 0; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 3px;">{{.Link}}</p>
             </div>
 
+            <!-- New separator to clearly separate the link option from the auth-code option -->
+            <hr class="separator" aria-hidden="true">
+
             <div class="auth-code-section">
-                <div class="auth-code-label">Or use this temporary verification code:</div>
+                <div class="auth-code-label"><strong>Or,</strong> use this temporary verification code:</div>
                 <div class="auth-code">{{ .EntryCode }}</div>
             </div>
 
@@ -168,6 +196,9 @@
             </div>
 
             <div class="details">
+                <div class="details-row">
+                    <span class="label">Created:</span> <time datetime="{{.Created}}">{{.Created}}</time>
+                </div>
                 <div class="details-row">
                     <span class="label">Expires:</span> <time datetime="{{.Expires}}">{{.Expires}}</time>
                 </div>

@@ -45,10 +45,18 @@ const EMAIL_TITLE = "Access code for %s"
 // Salt for SAS key derivation. Used to prevent rainbow table attacks.
 const SAS_KEY_SALT = "Ð¥ðVwj¯xR¨Øò\"9îzE5B:ëø1K*,EöþJjM"
 
+// Map of error codes to user-friendly messages
+var ErrorCodes = map[string]string{
+	"VERIFY_TOKEN_USED":    "This login link has already been used. Please request a new link.",
+	"VERIFY_TOKEN_EXPIRED": "This login link has expired or is invalid. Please request a new login link.",
+	"EMAIL_TOKEN_MISSING":  "The email verification token is missing. Please request a new login link.",
+}
+
 type emailLoginLink struct {
 	EntryName  string  // Name of the entry point (e.g., Ag C331)
 	Link       string  // The actual login link URL
 	EntryCode  string  // The entry code for the login link
+	Created    string  // Creation time of the login link
 	Expires    string  // Expiration time of the login link
 	LinkTTL    float64 // Link time-to-live in minutes
 	IP         string  // IP address of the user
@@ -110,10 +118,23 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 	}
 
 	r.GET("/login", func(c *gin.Context) {
-		// Collect necessary info for email
-		c.HTML(200, "email_login.html.tmpl", gin.H{
+
+		var pageData = gin.H{
 			"LinkTTL": LINK_TTL.Minutes(),
-		})
+		}
+
+		err := c.Query("error")
+		if err != "" {
+			if msg, exists := ErrorCodes[err]; exists {
+				pageData["Error"] = msg
+			} else {
+				pageData["Error"] = "An unknown error occurred. Please try again."
+				slog.Warn("Unknown error code in login URL", "error", err)
+			}
+		}
+
+		// Collect necessary info for email
+		c.HTML(200, "email_login.html.tmpl", pageData)
 	})
 
 	// Too lazy to support both HTML and JSON for now, just returns JSON
@@ -182,6 +203,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			EntryName:  entryId, // TODO: Get actual entry name
 			Link:       link,
 			EntryCode:  otp, // text version of the OTP
+			Created:    time.Now().Format(time.RFC3339),
 			Expires:    expires,
 			LinkTTL:    LINK_TTL.Minutes(),
 			IP:         c.ClientIP(),
@@ -229,7 +251,6 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		c.JSON(200, gin.H{
 			"message":  "Login link sent",
 			"otpclaim": token,
-			"id":       claim.ID, // It could be extracted from the token, but this is more explicit
 		})
 
 	})
@@ -256,7 +277,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		claim, err := jwt.DecodeAccessCodeJWT(token)
 		if err != nil {
-			slog.Warn("Failed to decode email status check token", "error", err, "ip", c.ClientIP())
+			slog.Warn("Failed to decode email status check token", "error", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to decode token. Please request a new login link."})
 			return
 		}
@@ -298,10 +319,27 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 				}
 
 				// Check if the OTP claim ID has been marked as verified
-				if emailLoginVerifyStore.Exists(c.Request.Context(), claim.ID) {
-					data["status"] = "authenticated"
+				confirmed, err := emailLoginVerifyStore.Consume(c.Request.Context(), claim.ID)
+				if confirmed {
+					data["status"] = "confirmed"
 					// No need to redirect to actual entryway page, email link has done that
 					data["redirect"] = UrlFor(c, "/entry/success")
+
+					// Send auth cookie
+					login(c, *claim)
+
+				} else if err != nil {
+					switch err {
+					case &NonceMissingError{}:
+						// Not verified yet, keep waiting
+					case &NonceExpiredError{}:
+						data["status"] = "expired"
+						data["error"] = "Login link has expired. Please request a new login link."
+					default:
+						slog.Error("Failed to check email login verify store", "error", err)
+						data["status"] = "error"
+						data["error"] = "Internal server error"
+					}
 				}
 
 				eventData, err := json.Marshal(data)
@@ -331,7 +369,6 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 				return
 			}
 		}
-
 	})
 
 	r.POST("/verify", func(c *gin.Context) {
@@ -402,7 +439,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		token := c.Param("token")
 		if token == "" {
 			slog.Warn("Email verification token is missing", "token", token, "ip", c.ClientIP())
-			c.HTML(400, "email_login.html.tmpl", gin.H{"error": "Token is required"})
+			c.Redirect(302, UrlFor(c, "/auth/email/login?error=EMAIL_TOKEN_MISSING"))
 			return
 		}
 
@@ -410,11 +447,11 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		if err != nil {
 			if err == jwt.ErrInvalidNonce {
 				slog.Info("Email verification token has been used", "error", err, "ip", c.ClientIP())
-				c.HTML(400, "email_login.html.tmpl", gin.H{"error": "Link has been already been used. Please request a new login link."})
+				c.Redirect(302, UrlFor(c, "/auth/email/login?error=VERIFY_TOKEN_USED"))
 				return
 			} else {
 				slog.Warn("Failed to decode email verification token", "error", err, "ip", c.ClientIP())
-				c.HTML(400, "email_login.html.tmpl", gin.H{"error": "Failed to decode token. Please request a new login link."})
+				c.Redirect(302, UrlFor(c, "/auth/email/login?error=VERIFY_TOKEN_EXPIRED"))
 			}
 			return
 		}
@@ -430,6 +467,11 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		//  - Add user id into SSE polling to auto-login
 
 		// On success, redirect to entryway page
+		c.JSON(200, gin.H{
+			"status":   "success",
+			"message":  "Email link verification successful. You can close this tab and return to the previous window.",
+			"redirect": UrlFor(c, "/entry/success"),
+		})
 	})
 
 }
