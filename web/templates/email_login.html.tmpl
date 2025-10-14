@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Door Entry System</title>
 
+    <base href="{{.BaseURL}}">
+
     <link href="/dist/assets/css/output.css" rel="stylesheet">
     <link href="/assets/css/jyu.css" rel="stylesheet">
 
@@ -34,6 +36,28 @@
 
         <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
             <div class="bg-white dark:bg-gray-800 px-4 py-8 shadow sm:rounded-lg sm:px-10">
+
+
+                <!-- Server-side error (rendered by backend) -->
+                <div id="server-error" class="{{ if .Error }}mt-4{{ else }}hidden{{ end }}">
+                    <div class="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.59c.75 1.334-.213 2.994-1.742 2.994H3.481c-1.529 0-2.492-1.66-1.742-2.994L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-.993.883L9 6v4a1 1 0 001.993.117L11 10V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-red-800 dark:text-red-200" id="server-error-content">
+                                    {{ if .Error }}
+                                        {{ .Error }}
+                                    {{ end }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Step indicator -->
                 <div class="flex items-center mb-6">
                     <div class="flex items-center justify-center h-8 w-8 rounded-full bg-blue-600 text-white font-bold mr-3">
@@ -71,23 +95,6 @@
                     <input type="hidden" name="timezone" id="timezone" value="">
                 </form>
 
-                <!-- Email Status messages -->
-                <div id="message" class="mt-4 hidden">
-                    <div class="rounded-md bg-green-50 dark:bg-green-900/20 p-4">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-green-800 dark:text-green-200">
-                                    Check your email for a login link. If you don't see it, please check your spam folder. The link will expire in {{.LinkTTL}} minutes.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <div id="otp-container" class="{{ if not .OTPClaim}}hidden{{end}} mt-6">
                     <div id="hr" class="mt-6 border-t border-gray-200 dark:border-gray-700"></div>
@@ -98,8 +105,27 @@
                         </div>
                         <h3 class="text-base font-medium text-gray-900 dark:text-white">Check your email</h3>
                     </div>
+
+                    <!-- Email Status messages -->
+                    <div id="message" class="mt-4 mb-4">
+                        <div class="rounded-md bg-green-50 dark:bg-green-900/20 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium text-green-800 dark:text-green-200">
+                                        Check your email for a login link. If you don't see it, please check your spam folder. The link will expire in {{.LinkTTL}} minutes.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <p class="text-sm text-gray-600 dark:text-gray-400">
-                        You can click the login link sent to your email and ignore this page, or you can fill out here the authentication code included in the email.
+                        You can use the login link sent to your email and ignore this page, or you can fill out here the authentication code included in the email.
                     </p>
                     <form class="mt-4 flex flex-col items-center" action="verify" method="POST" autocomplete="off" id="otp-form">
                         <label for="otp" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -138,46 +164,58 @@
 
     <script>
 
-    // Setup EventSource for server-sent events (if needed)
-    const url = new URL('verify', window.location);
-    const eventSource = new EventSource(url);
+    // Using SSE to listen for authentication status updates
+    function listenForAuthStatus(id) {
+        // Polls for authentication token via Server-Sent Events (SSE)
+        const url = new URL('status', window.location);
+        url.searchParams.append('id', id);
+        url.searchParams.append('cb', Date.now()); // Prevent caching
 
-    // 2. Event listener for incoming messages
-    // SSE messages that start with 'data: ' are received here
-    eventSource.onmessage = function(event) {
-        try {
-            // Parse the JSON string sent by the server
-            const data = JSON.parse(event.data);
-            
-            // TODO: Parse error
+        console.log("Connecting to SSE URL:", url.toString());
 
-            console.log("EventSource message received:", data);
+        const eventSource = new EventSource(url);
 
-            if (data.status === 'authenticated') {
-                statusDisplay.style.color = 'green';
-                
-                eventSource.close();
-                console.log('SSE connection closed by client.');
-            } else if (data.status === 'pending') {
-                statusDisplay.style.color = 'orange';
+        eventSource.addEventListener('open', function(event) {
+            console.log('SSE connection opened:', event);
+        });
+
+        eventSource.addEventListener('error', function(event) {
+            if (event.eventPhase == EventSource.CLOSED) {
+                console.log('SSE connection closed by server.');
+            } else {
+                console.error('SSE error:', event);
             }
+        });
 
-        } catch (e) {
-            console.error('Error parsing JSON:', e, 'Raw data:', event.data);
-        }
-    };
+        // Event listener for incoming messages
+        // SSE messages that start with 'data: ' are received here
+        eventSource.onmessage = function(event) {
+            try {
+                // Parse the JSON string sent by the server
+                const data = JSON.parse(event.data);
+                
+                // TODO: Parse error
 
-    // Optional: Event listener for when the connection is opened
-    eventSource.onopen = function() {
-        console.log('SSE connection established.');
-    };
+                console.log("EventSource message received:", data);
 
-    // Optional: Event listener for errors (including connection failure/reconnect attempts)
-    eventSource.onerror = function(err) {
-        console.error('EventSource failed:', err);
-        // EventSource automatically attempts to reconnect, so no need to manually handle that here.
-    };
+                if (data.status === 'authenticated') {
+                    eventSource.close();
+                    console.log('SSE connection closed by client.');
+                } else if (data.status === "expired") {
+                    eventSource.close();
+                    console.log('SSE connection closed by client due to token expiration.');
+                } else if (data.status === 'pending') {
+                    // TODO: Implement UI update for pending status
+                    console.log('Authentication pending...');
+                }
 
+            } catch (e) {
+                console.error('Error parsing JSON:', e, 'Raw data:', event.data);
+            }
+        };
+
+        return eventSource;
+    }
 
     // Helper function to perform fetch with timeout
     function postData(url = '', data = {}, options = {}) {
@@ -258,7 +296,8 @@
 
                 // Try to get support URL from config
                 try {
-                    const configResponse = await fetch('/config.json');
+                    // TODO: Use loadConfig()
+                    const configResponse = await fetch('config.json');
                     const config = await configResponse.json();
                     if (config?.SupportURL) {
                         return `${statusMessage} Please contact support at <a href="${config.SupportURL}" target="_blank">${config.SupportURL}</a>.`;
@@ -296,8 +335,10 @@
         const otpForm = document.getElementById('otp-form');
         const emailInput = document.getElementById('email');
         const otpInput = document.getElementById('otp');
-        const messageDiv = document.getElementById('message');
         const otpDiv = document.getElementById('otp-container');
+
+        // New: server-side error div
+        const serverErrorDiv = document.getElementById('server-error');
 
         // Set timezone
         const timezoneInput = document.getElementById('timezone');
@@ -321,7 +362,7 @@
 
             // Clear previous state
             FormUtils.clearError(emailInput);
-            messageDiv.classList.add('hidden');
+            if (serverErrorDiv) serverErrorDiv.classList.add('hidden'); // hide any server error when retrying
 
             // Disable button and show loading state
             button.textContent = 'Sending...';
@@ -332,7 +373,6 @@
                 const response = await postData(this.action, formData);
                 if (response.ok) {
                     // Success
-                    messageDiv.classList.remove('hidden');
                     otpDiv.classList.remove('hidden');
                     FormUtils.startCooldown(button);
 
@@ -372,6 +412,7 @@
             
             // Clear previous state
             FormUtils.clearError(otpInput);
+            if (serverErrorDiv) serverErrorDiv.classList.add('hidden'); // hide server error when retrying
             button.disabled = true;
             button.textContent = 'Verifying...';
 
@@ -403,7 +444,6 @@
                 button.textContent = 'Verify and proceed';
             }
         });
-
         // Handle page load focus
         document.addEventListener('DOMContentLoaded', function() {
             if (location.hash === '#OTP') {
@@ -413,6 +453,17 @@
                 emailInput.focus();
             }
         });
+
+        // Check for history changes to detect app state
+        window.addEventListener('hashchange', function() {
+            if (location.hash === '#OTP') {
+                otpForm.classList.remove('hidden');
+                otpInput.focus();
+            } else {
+                emailInput.focus();
+            }
+        });
+
     })();
 
     </script>
