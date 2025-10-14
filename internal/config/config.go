@@ -32,6 +32,7 @@ type Config struct {
 	// User authentication TTL in days.
 	UserAuthTTL uint `mapstructure:"user_auth_ttl"`
 
+	BaseURL    string `mapstructure:"base_url"` // Base URL for the application. May be relative, e.g. /entry-acces/, or absolute, e.g. https://example.com/entry-access/
 	SupportURL string `mapstructure:"support_url"`
 
 	// Email login configuration
@@ -66,6 +67,14 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("USER_AUTH_TTL", 8) // 8 days
 
 	viper.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
+	viper.SetDefault("BASE_URL", "/")
+
+	// Email defaults
+	viper.SetDefault("EMAIL_HOST", "host.docker.internal")
+	viper.SetDefault("EMAIL_PORT", "25")
+	viper.SetDefault("EMAIL_USERNAME", "")
+	viper.SetDefault("EMAIL_PASSWORD", "")
+	viper.SetDefault("EMAIL_FROM", "noreply@example.com")
 
 	var accessListFolder string
 	// If running in Docker, use /app/instance, otherwise use ./instance relative to cwd
@@ -81,13 +90,6 @@ func LoadConfig() (*Config, error) {
 	}
 
 	viper.SetDefault("ACCESS_LIST_FOLDER", accessListFolder) // Default folder for access lists
-
-	// Email defaults
-	viper.SetDefault("EMAIL_HOST", "host.docker.internal")
-	viper.SetDefault("EMAIL_PORT", "25")
-	viper.SetDefault("EMAIL_USERNAME", "")
-	viper.SetDefault("EMAIL_PASSWORD", "")
-	viper.SetDefault("EMAIL_FROM", "noreply@example.com")
 
 	// Load configuration from environment variables
 	viper.AutomaticEnv()

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -68,13 +69,46 @@ func IPAccessControl(allowedCIDRs []string) gin.HandlerFunc {
 	}
 }
 
+func BaseUrlMiddleware(baseurl string) gin.HandlerFunc {
+
+	var urlParts, err = url.Parse(baseurl)
+	if err != nil {
+		panic("Invalid baseurl in config: " + err.Error())
+	}
+
+	return func(c *gin.Context) {
+		// Check if the baseurl contains  host and protocol. Use from context if not.
+		if urlParts.Scheme == "" {
+			// Detect scheme from request
+			if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+				urlParts.Scheme = "https"
+			} else {
+				urlParts.Scheme = "http"
+			}
+			// Or use the request scheme if available
+			if c.Request.URL.Scheme != "" {
+				urlParts.Scheme = c.Request.URL.Scheme
+			}
+		}
+		if urlParts.Host == "" {
+			// Detect host from request
+			urlParts.Host = c.Request.Host
+		}
+		c.Set("BaseURL", urlParts.String())
+
+		c.Next()
+	}
+}
+
+func GetBaseURL(c *gin.Context) string {
+	return c.MustGet("BaseURL").(string)
+}
+
 func HTTPServer() *gin.Engine {
 	r := gin.Default()
 
 	r.Static("/assets/", "./web/assets/")
 	r.Static("/dist/assets", "./dist/assets") // Serve compiled CSS and fonts
-
-	r.LoadHTMLGlob("web/templates/*")
 
 	if Cfg.AllowedNetworks != "" {
 		slog.Debug("Enabling IP access control", "allowed_networks", Cfg.AllowedNetworks)
@@ -89,7 +123,9 @@ func HTTPServer() *gin.Engine {
 
 		r.Use(IPAccessControl(allowedCIDRs))
 	}
+
 	r.Use(securityHeaders)
+	r.Use(BaseUrlMiddleware(Cfg.BaseURL))
 
 	// Inject the HTML renderer into the context for access in handlers
 	// This allows rendering templates in sub-packages
@@ -100,22 +136,11 @@ func HTTPServer() *gin.Engine {
 		c.Next()
 	})
 
-	r.GET("/ping", func(c *gin.Context) {
-		msg := c.Query("ping")
-		if msg == "" {
-			msg = "pong"
-		}
+	// Load HTML templates
+	r.LoadHTMLGlob("web/templates/*")
 
-		authenticated := false
-		if c.GetString("userID") != "" {
-			authenticated = true
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"message":       msg,
-			"authenticated": authenticated,
-		})
-	})
-
+	// --- Routes ---
+	// Serve config for client-side use
 	r.GET("/config.json", func(c *gin.Context) {
 		// Provide a initial config
 		var clientCfg = gin.H{
@@ -126,6 +151,9 @@ func HTTPServer() *gin.Engine {
 
 		c.JSON(http.StatusOK, clientCfg)
 	})
+
+	root := r.Group("/")
+	routes.Ping(root)
 
 	r.GET("/", func(ctx *gin.Context) {
 		var qr_url = UrlFor(ctx, "/qr")
@@ -148,5 +176,7 @@ func HTTPServer() *gin.Engine {
 	email_rg := auth_rg.Group("/email")
 	routes.EmailLoginRoute(email_rg)
 
+	// Debug routes
+	routes.RegisterDebugRoutes(r)
 	return r
 }
