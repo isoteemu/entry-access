@@ -1,5 +1,7 @@
 package routes
 
+// OTP Handling
+
 import (
 	"crypto/hmac"
 	"crypto/rand"
@@ -8,10 +10,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +26,8 @@ import (
 	"entry-access-control/internal/email"
 	"entry-access-control/internal/jwt"
 	. "entry-access-control/internal/utils"
+
+	gojwt "github.com/golang-jwt/jwt/v5"
 )
 
 // TODO: Get actual entry ID
@@ -44,6 +48,20 @@ const EMAIL_TITLE = "Access code for %s"
 
 // Salt for SAS key derivation. Used to prevent rainbow table attacks.
 const SAS_KEY_SALT = "Ð¥ðVwj¯xR¨Øò\"9îzE5B:ëø1K*,EöþJjM"
+
+const (
+	JWT_AUDIENCE_EMAIL_LINK  = "email_link"  // Audience for email link verification
+	JWT_AUDIENCE_EMAIL_OTP   = "email_otp"   // Audience for email OTP verification
+	JWT_AUDIENCE_EMAIL_LOGIN = "email_login" // Audience for logging user in
+)
+
+const (
+	VERIFY_STATUS_ERROR         = "error"
+	VERIFY_STATUS_EXPIRED       = "expired"
+	VERIFY_STATUS_PENDING       = "pending"
+	VERIFY_STATUS_CONFIRMED     = "confirmed"
+	VERIFY_STATUS_AUTHENTICATED = "authenticated" // Not used, SSE doesn't need to react to this
+)
 
 // Map of error codes to user-friendly messages
 var ErrorCodes = map[string]string{
@@ -109,6 +127,75 @@ func login(c *gin.Context, claim jwt.AccessCodeClaim) {
 	jwt.ConsumeClaimNonce(&claim.RegisteredClaims)
 }
 
+type EventErr struct {
+	Status string `json:"status"`
+	Error  string `json:"error"`
+}
+
+// EventError sends an error event to the SSE client
+func eventMessage(c *gin.Context, data any) {
+	// Format the data according to SSE specification
+	// Data must start with 'data: ' and end with '\n\n'
+	// We are sending a JSON string for the status
+
+	serialized, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("Failed to marshal SSE event message", "error", err)
+		return
+	}
+
+	serialized = append([]byte("data: "), serialized...)
+	serialized = append(serialized, []byte("\n\n")...)
+
+	c.Writer.Write(serialized)
+
+	// Flush the buffer to ensure the data is sent immediately
+	c.Writer.Flush()
+}
+
+// Generate a URL for showing door open
+func SuccessUrl(c *gin.Context, entryId string, data ...map[string]interface{}) string {
+	entryToken, err := genEntryToken(entryId)
+	if err != nil {
+		slog.Error("Failed to generate entry token", "error", err)
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+	}
+	// Convert data to URL parameters
+	params := ""
+	if len(data) > 0 {
+		paramList := []string{}
+		for k, v := range data[0] {
+			paramList = append(paramList, fmt.Sprintf("%s=%v", template.URLQueryEscaper(k), template.URLQueryEscaper(fmt.Sprintf("%v", v))))
+		}
+		if len(paramList) > 0 {
+			params = "?" + strings.Join(paramList, "&")
+		}
+	}
+
+	return UrlFor(c, fmt.Sprintf("/entry/%s%s", entryToken, params))
+}
+
+// isSafeUrl checks if the target URL is within the same origin as the base URL
+func isSafeUrl(c *gin.Context, targetUrl string) bool {
+	baseUrl := c.MustGet("BaseURL").(string)
+
+	refUrl, _ := url.Parse(baseUrl)
+	testUrl, err := url.Parse(targetUrl)
+	if err != nil {
+		slog.Debug("Failed to parse target URL for safety check", "url", targetUrl, "error", err)
+		return false
+	}
+
+	// Check scheme
+	if refUrl.Scheme != testUrl.Scheme {
+		slog.Debug("Target URL scheme does not match base URL", "target_scheme", testUrl.Scheme, "base_scheme", refUrl.Scheme)
+		return false
+	}
+
+	// Check host and path prefix
+	return refUrl.Host == testUrl.Host && strings.HasPrefix(testUrl.Path, refUrl.Path)
+}
+
 func EmailLoginRoute(r *gin.RouterGroup) {
 
 	emailLoginVerifyStore, err := NewStore(Cfg)
@@ -121,12 +208,14 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		var pageData = gin.H{
 			"LinkTTL": LINK_TTL.Minutes(),
+			"Error":   "",
 		}
 
+		// Check for error code in URL, display friendly message
 		err := c.Query("error")
 		if err != "" {
-			if msg, exists := ErrorCodes[err]; exists {
-				pageData["Error"] = msg
+			if errorMsg, exists := ErrorCodes[err]; exists {
+				pageData["Error"] = errorMsg
 			} else {
 				pageData["Error"] = "An unknown error occurred. Please try again."
 				slog.Warn("Unknown error code in login URL", "error", err)
@@ -185,16 +274,35 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		code := otpEncode(otp, Cfg.Secret)
 
-		claim := jwt.NewAccessCodeClaim(code, emailAddr, entryId, uint(LINK_TTL.Seconds()))
+		// Create two JWT claims: one for OTP verification, one for email link
+		// Both claims contain the same info, but different audience to distinguish them
+		// OTP claim is returned to the client for verification
+		// Link claim is sent in the email link for auto-verification
 
-		token, err := jwt.GenerateJWT(claim)
+		// Both claims have the same nonce, so consuming one will invalidate the other
+		// This prevents reuse of either method
+
+		baseClaim := jwt.NewAccessCodeClaim(code, emailAddr, entryId, uint(LINK_TTL.Seconds()))
+
+		otpClaim := baseClaim
+		otpClaim.Audience = []string{"email_otp"}
+		otpToken, err := jwt.GenerateJWT(otpClaim)
 		if err != nil {
 			slog.Error("Failed to generate OTP claim token", "error", err)
-			loginErr(c, 500, "Internal server error: failed to generate OTP claim")
+			loginErr(c, 500, "Internal server error: failed to generate OTP token")
 			return
 		}
 
-		link := UrlFor(c, "/auth/email/verify/"+token)
+		linkClaim := baseClaim
+		linkClaim.Audience = []string{"email_link"}
+		linkToken, err := jwt.GenerateJWT(linkClaim)
+		if err != nil {
+			slog.Error("Failed to generate link claim token", "error", err, "audience", linkClaim.Audience)
+			loginErr(c, 500, "Internal server error: failed to generate email link token")
+			return
+		}
+
+		link := UrlFor(c, "/auth/email/verify/"+linkToken)
 
 		slog.Debug("Generated email login link and OTP", "email", emailAddr, "link", link, "otp", otp, "expires", expires)
 
@@ -249,40 +357,24 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		// Return token for OTP validation
 		c.JSON(200, gin.H{
+			"status":   "success",
 			"message":  "Login link sent",
-			"otpclaim": token,
+			"otpclaim": otpToken,
 		})
 
 	})
 
 	// Check if the user has clicked the link or submitted the OTP code
-	r.GET("/status/:token", func(c *gin.Context) {
-
-		userID, err := verifyAuth(c)
-		if err == nil && userID != "" {
-			// Already authenticated, redirect to entryway page
-			c.JSON(200, gin.H{
-				"status": "authenticated",
-			})
-			return
-		}
+	r.GET("/status", func(c *gin.Context) {
 
 		// Decode JWT token from URL parameter
-		token := c.Param("token")
+		token := c.Query("token")
 		if token == "" {
 			slog.Warn("Email status check token is missing", "token", token)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
 			return
 		}
 
-		claim, err := jwt.DecodeAccessCodeJWT(token)
-		if err != nil {
-			slog.Warn("Failed to decode email status check token", "error", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to decode token. Please request a new login link."})
-			return
-		}
-
-		// Not authenticated, start SSE to wait for OTP verification
 		// Set SSE headers
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -294,6 +386,31 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		// Ensure the connection is closed when the client disconnects
 		clientGone := c.Request.Context().Done()
 
+		claim, err := jwt.DecodeAccessCodeJWT(token, gojwt.WithAudience(JWT_AUDIENCE_EMAIL_OTP))
+		if err != nil {
+			slog.Warn("Failed to decode email status check token", "error", err)
+			eventMessage(c, EventErr{
+				Status: "error",
+				Error:  "Failed to decode token. Please request a new login link.",
+			})
+			return
+		}
+
+		// Generate a login token for the user to use once verified
+		loginClaim := *claim // Make a copy to avoid modifying the original
+		loginClaim.Audience = []string{JWT_AUDIENCE_EMAIL_LOGIN}
+		loginClaim.AuthenticateOnly = true
+		loginToken, err := jwt.GenerateJWT(loginClaim)
+		if err != nil {
+			slog.Error("Failed to generate login claim token", "error", err, "audience", loginClaim.Audience)
+			eventMessage(c, EventErr{
+				Status: "error",
+				Error:  "Internal server error. Please try again later.",
+			})
+			return
+		}
+		loginUrl := UrlFor(c, "/auth/email/verify/"+loginToken)
+
 		// Start the event loop
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -301,66 +418,39 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		for {
 			select {
 			case <-ticker.C:
-				// Format the data according to SSE specification
-				// Data must start with 'data: ' and end with '\n\n'
-				// We are sending a JSON string for the status
+
+				// TODO: Uudelleenfaktorinti kesken
 
 				var data = gin.H{
 					"status": "pending",
 				}
-				// Check if the user has verified the OTP by looking up the nonce store
-				// If verified, set status to "authenticated"
-
-				userID, err := verifyAuth(c)
-				if err == nil && userID != "" {
-					data["status"] = "authenticated"
-					// No need to redirect to actual entryway page, email link has done that
-					data["redirect"] = UrlFor(c, "/entry/success")
-				}
 
 				// Check if the OTP claim ID has been marked as verified
 				confirmed, err := emailLoginVerifyStore.Consume(c.Request.Context(), claim.ID)
-				if confirmed {
-					data["status"] = "confirmed"
-					// No need to redirect to actual entryway page, email link has done that
-					data["redirect"] = UrlFor(c, "/entry/success")
-
-					// Send auth cookie
-					login(c, *claim)
-
+				if confirmed && err == nil {
+					data["status"] = VERIFY_STATUS_CONFIRMED
+					data["redirect"] = loginUrl
 				} else if err != nil {
 					switch err {
 					case &NonceMissingError{}:
 						// Not verified yet, keep waiting
+						data["status"] = VERIFY_STATUS_PENDING
 					case &NonceExpiredError{}:
-						data["status"] = "expired"
+						data["status"] = VERIFY_STATUS_EXPIRED
 						data["error"] = "Login link has expired. Please request a new login link."
 					default:
-						slog.Error("Failed to check email login verify store", "error", err)
-						data["status"] = "error"
-						data["error"] = "Internal server error"
+						// Not found - assume not verified yet
+						data["status"] = VERIFY_STATUS_PENDING
 					}
+				} else {
+					slog.Warn("Email login verify store returned unexpected result", "confirmed", confirmed, "error", err)
 				}
 
-				eventData, err := json.Marshal(data)
-				if err != nil {
-					slog.Error("Failed to marshal SSE data", "error", err)
-					return
-				}
-				eventData = append([]byte("data: "), eventData...)
-				eventData = append(eventData, []byte("\n\n")...)
+				// Send event to client
+				eventMessage(c, data)
 
-				// Write the event to the response stream
-				_, err = io.WriteString(c.Writer, string(eventData))
-				if err != nil {
-					// Client has likely disconnected
-					slog.Debug("SSE client disconnected", "error", err)
-					return
-				}
-				// Flush the buffer to ensure the data is sent immediately
-				c.Writer.Flush()
-				if data["status"] == "authenticated" {
-					slog.Debug("SSE client authenticated, closing connection")
+				if data["status"] == VERIFY_STATUS_CONFIRMED || data["status"] == VERIFY_STATUS_EXPIRED {
+					slog.Debug("Ending SSE connection for email login status", "status", data["status"], "email", claim.Email)
 					return
 				}
 			case <-clientGone:
@@ -394,7 +484,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		// Decode claim
 		// TODO: Do not consume the claim until OTP is verified
-		emailClaim, err := jwt.DecodeAccessCodeJWT(claim)
+		emailClaim, err := jwt.DecodeAccessCodeJWT(claim, gojwt.WithAudience(JWT_AUDIENCE_EMAIL_OTP))
 		if err != nil {
 			if err == jwt.ErrInvalidNonce {
 				slog.Info("OTP claim token has been used", "error", err)
@@ -433,7 +523,6 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		})
 	})
 
-	// TODO: Implement GET /verify/:token route to handle email link clicks
 	r.GET("/verify/:token", func(c *gin.Context) {
 		// Handle email verification link
 		token := c.Param("token")
@@ -443,7 +532,8 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			return
 		}
 
-		emailClaim, err := jwt.DecodeAccessCodeJWT(token)
+		// TODO: Improve logging based on audience
+		emailClaim, err := jwt.DecodeAccessCodeJWT(token, gojwt.WithAudience(JWT_AUDIENCE_EMAIL_LINK, JWT_AUDIENCE_EMAIL_LOGIN))
 		if err != nil {
 			if err == jwt.ErrInvalidNonce {
 				slog.Info("Email verification token has been used", "error", err, "ip", c.ClientIP())
@@ -458,9 +548,19 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		slog.Info("User clicked email link", "email", emailClaim.Email)
 
-		// Store the ID of the clicked link to allow polling to detect it
-		ttl := time.Duration(emailClaim.ExpiresAt.Unix()-time.Now().UTC().Unix()) * time.Second
-		emailLoginVerifyStore.Put(c.Request.Context(), emailClaim.ID, ttl)
+		// If the claim has AuthenticateOnly set, log the user in directly. Otherwise,
+		// just mark the claim as verified for polling to detect.
+		if emailClaim.AuthenticateOnly {
+			login(c, *emailClaim)
+			entryID := emailClaim.EntryID
+
+			// Redirect to entryway page
+			c.Redirect(http.StatusFound, SuccessUrl(c, entryID))
+		} else {
+			// Store the ID of the clicked link to allow polling to detect it
+			ttl := time.Duration(emailClaim.ExpiresAt.Unix()-time.Now().UTC().Unix()) * time.Second
+			emailLoginVerifyStore.Put(c.Request.Context(), emailClaim.ID, ttl)
+		}
 
 		// TODO: Check the entry attempted to access
 		//  - Redirect to entry page
