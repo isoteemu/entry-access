@@ -24,24 +24,29 @@ const DIST_DIR = "dist"
 // Initialize logger
 func InitLogger(cfg *Config) *slog.Logger {
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// Determine level from config and set it on the handler options.
+	var level slog.Level
+	switch strings.ToUpper(cfg.LogLevel) {
+	case "DEBUG":
+		level = slog.LevelDebug
+	case "INFO":
+		level = slog.LevelInfo
+	case "WARN", "WARNING":
+		level = slog.LevelWarn
+	case "ERROR":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+		println("Invalid log level in config, defaulting to INFO")
+	}
+
+	handlerOpts := &slog.HandlerOptions{
+		Level: level,
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, handlerOpts))
 	slog.SetDefault(logger)
 
-	logLevel := strings.ToUpper(cfg.LogLevel)
-
-	switch logLevel {
-	case "DEBUG":
-		slog.SetLogLoggerLevel(slog.LevelDebug)
-	case "INFO":
-		slog.SetLogLoggerLevel(slog.LevelInfo)
-	case "WARN":
-		slog.SetLogLoggerLevel(slog.LevelWarn)
-	case "ERROR":
-		slog.SetLogLoggerLevel(slog.LevelError)
-	default:
-		slog.SetLogLoggerLevel(slog.LevelInfo)
-		slog.Warn("Invalid log level, defaulting to info", "log_level", cfg.LogLevel)
-	}
 	return logger
 }
 
