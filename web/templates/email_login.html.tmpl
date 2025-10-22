@@ -37,7 +37,6 @@
         <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
             <div class="bg-white dark:bg-gray-800 px-4 py-8 shadow sm:rounded-lg sm:px-10">
 
-
                 <!-- Server-side error (rendered by backend) -->
                 <div id="server-error" class="{{ if .Error }}mt-4{{ else }}hidden{{ end }}">
                     <div class="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
@@ -162,13 +161,36 @@
 
 
 
-    <script>
+    <script type="module">
+
+    // Load config.json
+    import { loadConfig } from '/assets/js/app.js';
+
+    const config = await loadConfig();
+
+    // Show error in server error div
+    function err(msg) {
+        console.error(msg);
+        const serverErrorDiv = document.getElementById('server-error');
+        const serverErrorContent = document.getElementById('server-error-content');
+
+        let statusMessage = msg || 'An unexpected error occurred.';
+        if (config?.SupportURL) {
+            statusMessage += ` Please contact support at <a href="${config.SupportURL}" target="_blank">${config.SupportURL}</a>.`;
+        }
+
+        if (serverErrorDiv && serverErrorContent) {
+            serverErrorContent.innerHTML = statusMessage;
+            serverErrorDiv.classList.remove('hidden');
+            serverErrorDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
 
     // Using SSE to listen for authentication status updates
-    function listenForAuthStatus(id) {
+    function listenForAuthStatus(token) {
         // Polls for authentication token via Server-Sent Events (SSE)
         const url = new URL('status', window.location);
-        url.searchParams.append('id', id);
+        url.searchParams.append('token', token);
         url.searchParams.append('cb', Date.now()); // Prevent caching
 
         console.log("Connecting to SSE URL:", url.toString());
@@ -180,8 +202,14 @@
         });
 
         eventSource.addEventListener('error', function(event) {
-            if (event.eventPhase == EventSource.CLOSED) {
+            console.log('SSE connection error:', event, event.type);
+            // Handle different error scenarios
+            if (event.type == 'error') {
+                err('SSE connection error occurred. Please try again.');
+                eventSource.close();
+            } else if (event.eventPhase == EventSource.CLOSED) {
                 console.log('SSE connection closed by server.');
+                eventSource.close();
             } else {
                 console.error('SSE error:', event);
             }
@@ -190,20 +218,29 @@
         // Event listener for incoming messages
         // SSE messages that start with 'data: ' are received here
         eventSource.onmessage = function(event) {
+            console.log('SSE message received:', event.data);
             try {
                 // Parse the JSON string sent by the server
                 const data = JSON.parse(event.data);
-                
-                // TODO: Parse error
 
                 console.log("EventSource message received:", data);
-
-                if (data.status === 'authenticated') {
+                if (data.error) {
+                    err(data.error);
                     eventSource.close();
-                    console.log('SSE connection closed by client.');
+                    return;
+                }
+
+                if (data.status === 'confirmed') {
+                    eventSource.close();
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        err('No redirect URL provided. Please try logging in again.');
+                    }
                 } else if (data.status === "expired") {
                     eventSource.close();
                     console.log('SSE connection closed by client due to token expiration.');
+                    err('Login link has expired. Please request a new login link.');
                 } else if (data.status === 'pending') {
                     // TODO: Implement UI update for pending status
                     console.log('Authentication pending...');
@@ -378,16 +415,16 @@
 
                     const data = await response.json();
                     console.log("Response data:", data);
-                    if (data?.otpclaim) {
-                        otpForm.querySelector('input[name="otpclaim"]').value = data.otpclaim;
-                        otpInput.focus();
-                    } else {
+
+                    // Check that otpclaim exists
+                    if (!data?.otpclaim) {
                         throw new Error("No otpclaim received");
                     }
-
-                    // Update URL hash without scrolling
-                    // history.replaceState(null, '', '#OTP');
+                    otpForm.querySelector('input[name="otpclaim"]').value = data.otpclaim;
+                    otpInput.focus();
                     window.location.hash = 'OTP';
+                    // Start listening for auth status via SSE
+                    listenForAuthStatus(data.otpclaim);
                 } else {
                     // Handle error response
                     const errorMsg = await FormUtils.parseErrorResponse(response) || 'Failed to send login link. Please try again.';

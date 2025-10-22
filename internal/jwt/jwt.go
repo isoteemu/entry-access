@@ -74,7 +74,6 @@ func DecodeAuthJWT(tokenString string) (*AuthClaims, error) {
 	}
 	// Note: We do not consume the nonce here as auth tokens are long-lived and
 	// can be renewed. Nonce consumption is done during token renewal.
-	// This is to prevent DoS attacks with random nonces.
 	return claims, nil
 }
 
@@ -111,9 +110,10 @@ func mustCreateRegisteredClaim(ttl uint) jwt.RegisteredClaims {
 
 // Claim when user is requesting access code
 type AccessCodeClaim struct {
-	Verify  string `json:"verify"`
-	Email   string `json:"email"`
-	EntryID string `json:"entry_id"`
+	Verify           string `json:"verify"`
+	Email            string `json:"email"`
+	EntryID          string `json:"entry_id"`
+	AuthenticateOnly bool   `json:"auth,omitempty"` // Whether to send authentication token after verification
 	jwt.RegisteredClaims
 }
 
@@ -126,23 +126,12 @@ func NewAccessCodeClaim(otpVerify string, email string, entryId string, ttl uint
 	}
 }
 
-func DecodeAccessCodeJWT(tokenString string) (*AccessCodeClaim, error) {
-	claims, err := decodeJWT(tokenString, &AccessCodeClaim{})
+// NOTE: Nonce is  not consumed here. It must be consumed by the caller after validating the token.
+func DecodeAccessCodeJWT(tokenString string, options ...jwt.ParserOption) (*AccessCodeClaim, error) {
+	claims, err := decodeJWT(tokenString, &AccessCodeClaim{}, options...)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: Do not consume the nonce until entry has been verified
-	// This is to allow the user to retry OTP verification if they fail
-	// the first time.
-	// ctx := context.Background()
-	// // Consume nonce to prevent replay attacks
-	// if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return nil, ErrInvalidNonce
-	// }
 	return claims, nil
 }
 
@@ -177,13 +166,16 @@ func GenerateJWT(claims jwt.Claims) (string, error) {
 	return token.SignedString(JWTSecret)
 }
 
-func decodeJWT[T jwt.Claims](tokenString string, claimsType T) (T, error) {
+func decodeJWT[T jwt.Claims](tokenString string, claimsType T, options ...jwt.ParserOption) (T, error) {
 	var zero T
+
+	// Add default options
+	options = append(options, jwt.WithValidMethods([]string{tokenSignatureAlg.Alg()}))
 
 	parsedToken, err := jwt.ParseWithClaims(tokenString, claimsType, func(token *jwt.Token) (interface{}, error) {
 		JWTSecret := []byte(Cfg.Secret)
 		return JWTSecret, nil
-	}, jwt.WithValidMethods([]string{tokenSignatureAlg.Alg()}))
+	}, options...)
 
 	if err != nil {
 		return zero, err
