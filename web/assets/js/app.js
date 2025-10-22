@@ -258,13 +258,52 @@ class DeviceProvisioning {
     }
 }
 
+/**
+ * Loads configuration data with caching
+ * Loads config once per page load, caching it in local storage.
+ * If load fails, falls back to local storage cache if available.
+ */
 async function loadConfig() {
+    // Load configuration data with caching
+    const cacheKey = 'app_config_cache_v1';
+
     try {
-        const response = await fetch('/config.json');
-        return await response.json();
+        const response = fetch('/config.json', {cache: 'no-store'})
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(configData => {
+                // Cache in local storage
+                localStorage.setItem(cacheKey, JSON.stringify(configData));
+                return configData;
+            });
+        
+        return await response;
     } catch (error) {
-        console.error('Config load failed:', error);
+        console.error('Config fetch failed, attempting to load from cache:', error);
+        // Fallback to local storage cache
+        const cachedConfig = localStorage.getItem(cacheKey);
+        if (cachedConfig) {
+            try {
+                return JSON.parse(cachedConfig);
+            } catch (parseError) {
+                console.error('Failed to parse cached config:', parseError);
+                localStorage.removeItem(cacheKey);
+                throw parseError;
+            }
+        } else {
+            console.warn('No cached config found.');
+            throw error;
+        }
     }
+}
+
+// TODO: Add version check function
+function checkVersion() {
+    // Fetch version, and reload if mismatch
 }
 
 export {
