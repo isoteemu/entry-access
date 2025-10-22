@@ -53,9 +53,7 @@ func getEntryToken(entryID string) (string, error) {
 		}
 		// Check expiration (assuming the token is a JWT)
 		exp := claims.ExpiresAt.Time.Unix()
-		if err != nil {
-			return "", fmt.Errorf("invalid token payload")
-		}
+
 		if time.Now().Unix() > exp {
 			slog.Debug("Entry token expired, creating a new one", "exp", exp, "entryID", entryID)
 			createToggle = true
@@ -65,7 +63,7 @@ func getEntryToken(entryID string) (string, error) {
 	}
 
 	if createToggle {
-		// Notice: To avoid shadowing, no `token, err := ...`
+		// Notice: To avoid shadowing, not `token, err := ...`
 		var err error
 		token, err = genEntryToken(entryID)
 		slog.Debug("Generated new entry token", "token", token, "entryID", entryID)
@@ -87,7 +85,7 @@ func EntryRoute(r *gin.RouterGroup) {
 		}
 
 		// Redirect if cache buster is not set - just to be sure
-		if c.Query("c") == "" {
+		if c.Query("cb") == "" {
 			slog.Debug("Cache buster not set, redirecting")
 			c.Redirect(http.StatusFound, "/qr?cb="+strconv.FormatInt(time.Now().UTC().Unix(), 16))
 			return
@@ -106,7 +104,7 @@ func EntryRoute(r *gin.RouterGroup) {
 		// Generate URL
 
 		// Generate URL pointing to self
-		url := UrlFor(c, "/e/"+token)
+		url := UrlFor(c, "/entry/"+token)
 
 		// We could cache qr code, but it takes milliseconds to generate
 		qr, err := qrcode.Encode(url, qrcode.Medium, QR_IMAGE_SIZE)
@@ -120,7 +118,14 @@ func EntryRoute(r *gin.RouterGroup) {
 		c.Data(http.StatusOK, "image/png", qr)
 	})
 
-	r.GET("/e/:token", func(c *gin.Context) {
+	// TODO: Integrate token check, just to show sensible message.
+	r.GET("/success", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "access_granted.html.tmpl", H(c, gin.H{
+			"SupportURL": Cfg.SupportURL,
+		}))
+	})
+
+	r.GET("/:token", func(c *gin.Context) {
 		if err, _ := checkProvisioning(c); err != nil {
 			log.Printf("Provisioning check failed: %v", err)
 			c.JSON(http.StatusForbidden, gin.H{"error": "Provisioning check failed"})
@@ -131,5 +136,4 @@ func EntryRoute(r *gin.RouterGroup) {
 
 		c.JSON(http.StatusOK, gin.H{"token": token})
 	})
-
 }
