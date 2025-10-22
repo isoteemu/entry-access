@@ -260,11 +260,18 @@ class DeviceProvisioning {
 
 /**
  * Loads configuration data with caching
- * Loads config once per page load, caching it in local storage.
+ * Loads config once per page load, caching it in memory and local storage.
  * If load fails, falls back to local storage cache if available.
  */
+let configCache = null; // Module-level cache for current page load
+
 async function loadConfig() {
-    // Load configuration data with caching
+    // Return cached config if already loaded during this page session
+    if (configCache !== null) {
+        console.log('Returning cached config from memory');
+        return configCache;
+    }
+
     const cacheKey = 'app_config_cache_v1';
 
     try {
@@ -278,6 +285,9 @@ async function loadConfig() {
             .then(configData => {
                 // Cache in local storage
                 localStorage.setItem(cacheKey, JSON.stringify(configData));
+                // Cache in memory for this page load
+                configCache = configData;
+                console.log('Config loaded and cached');
                 return configData;
             });
         
@@ -288,7 +298,9 @@ async function loadConfig() {
         const cachedConfig = localStorage.getItem(cacheKey);
         if (cachedConfig) {
             try {
-                return JSON.parse(cachedConfig);
+                configCache = JSON.parse(cachedConfig);
+                console.log('Config loaded from localStorage cache');
+                return configCache;
             } catch (parseError) {
                 console.error('Failed to parse cached config:', parseError);
                 localStorage.removeItem(cacheKey);
