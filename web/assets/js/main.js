@@ -1,17 +1,40 @@
 import { PingMonitor } from "./ping.js";
 import { ErrorHandler } from "./error.js";
 
+import { loadConfig } from "./app.js";
+
 let config = {};
 
-const config_promise = fetch('/config.json')
-    .then(response => response.json())
-    .then(data => {
-        config = data;
-        console.log('Configuration loaded:', config);
-    })
-    .catch(error => {
-        console.error('Error loading configuration:', error);
-    });
+const config_promise = loadConfig().then(cfg => {
+    config = cfg;
+    console.log("Config loaded:", config);
+
+    // Fetch QR code and support contact info from config
+    if (config.SupportQRURL) {
+        // Fetch and cache the support QR code image
+        fetch(config.SupportQRURL).then(response => {
+            if (response.ok) {
+                return response.blob();
+            } else {
+                throw new Error(`Failed to fetch support QR code: ${response.statusText}`);
+            }
+        }).then(blob => {
+            const qrUrl = URL.createObjectURL(blob);
+            localStorage.setItem('support_qr_url', qrUrl);
+            console.log("Support QR code cached");
+        }).catch(err => {
+            console.error("Error fetching support QR code:", err);
+        });
+
+        // Store support contact info
+        if (config.SupportContact) {
+            localStorage.setItem('support_contact', config.SupportContact);
+            console.log("Support contact info cached");
+        }
+    }
+}).catch(err => {
+    console.error("Failed to load config:", err);
+});
 
 document.addEventListener('DOMContentLoaded', async function() {
     await config_promise; // Ensure config is loaded before proceeding
@@ -24,15 +47,17 @@ function run() {
     // Initialize your application
     console.log('App starting...');
 
-    // Initialize the error handler
-    const errorHandler = new ErrorHandler({
-        supportQRUrl: '/dist/assets/support_qr.png',
-        supportContact: config.SupportURL || 'Technical Support',
+    // TODO: Fix the error handler to use latest support info from config
+    let errorOptions = {
+        supportQRUrl: localStorage.getItem('support_qr_url') || '/dist/assets/support_qr.png',
+        supportContact: localStorage.getItem('support_contact') || config.SupportURL || 'Technical Support',
         autoShow: true // Automatically show overlay when errors are added
-    });
+    };
+
+    // Initialize the error handler
+    const errorHandler = new ErrorHandler(errorOptions);
 
     window.errorHandler = errorHandler;
-
 
     const pingMonitor = new PingMonitor("/ping", 3);
     pingMonitor.start();

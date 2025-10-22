@@ -285,8 +285,10 @@ async function loadConfig() {
             .then(configData => {
                 // Cache in local storage
                 localStorage.setItem(cacheKey, JSON.stringify(configData));
+                configData['loaded'] = true;
                 // Cache in memory for this page load
                 configCache = configData;
+
                 console.log('Config loaded and cached');
                 return configData;
             });
@@ -299,6 +301,7 @@ async function loadConfig() {
         if (cachedConfig) {
             try {
                 configCache = JSON.parse(cachedConfig);
+                configCache['loaded'] = false;
                 console.log('Config loaded from localStorage cache');
                 return configCache;
             } catch (parseError) {
