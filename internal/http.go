@@ -19,6 +19,8 @@ import (
 	sloggin "github.com/samber/slog-gin"
 )
 
+const API_V1_PREFIX = "/api/v1"
+
 func securityHeaders(c *gin.Context) {
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("X-Frame-Options", "DENY")
@@ -188,13 +190,13 @@ func HTTPServer() *gin.Engine {
 		c.JSON(http.StatusOK, clientCfg)
 	})
 
-	root := r.Group("/")
-	routes.Ping(root)
-
 	r.GET("/", func(ctx *gin.Context) {
 		var qr_url = UrlFor(ctx, "/qr")
 		ctx.HTML(http.StatusOK, "qr.html.tmpl", gin.H{"QRCodeURL": qr_url})
 	})
+
+	apirg := r.Group(API_V1_PREFIX)
+	routes.Health(apirg)
 
 	// Provisioning routes
 	rg := r.Group("/api/provision")

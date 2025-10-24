@@ -1,5 +1,5 @@
 class PingMonitor {
-    constructor(serverUrl = '/api/health', failureThreshold = 3) {
+    constructor(serverUrl = '/api/v1/health', failureThreshold = 3) {
         this.serverUrl = serverUrl;
         this.failureThreshold = failureThreshold;
         this.consecutiveFailures = 0;

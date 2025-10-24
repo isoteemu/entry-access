@@ -41,8 +41,9 @@ function run() {
 
     window.errorHandler = errorHandler;
 
-    const pingMonitor = new PingMonitor("/ping", 3);
-    pingMonitor.start();
+    const pingMonitor = new PingMonitor("/api/v1/health", 3);
+    // TODO: Temporarily disable ping monitoring for testing
+    // pingMonitor.start();
     const pingErrorID = "ping_error";
     const networkErrorID = "network_error";
 
