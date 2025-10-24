@@ -49,32 +49,45 @@ func runningInDocker() bool {
 	return false
 }
 
+func getConfigPath() string {
+	if runningInDocker() {
+		return "/app/instance"
+	}
+	return "./instance"
+}
+
 // LoadConfig reads configuration from environment variables and returns a Config struct.
 func LoadConfig() (*Config, error) {
 	var cfg Config
 
+	v := viper.New()
+	v.SetConfigName("config")
+	v.AddConfigPath(getConfigPath())
+	v.AddConfigPath(".")
+	v.SetEnvPrefix("")
+
 	// Set defaults. Defaults needs to be defined for config fields to be populated from env.
-	viper.SetDefault("SECRET", "")
-	viper.SetDefault("TOKEN_TTL", 60)
-	viper.SetDefault("TOKEN_EXPIRY_SKEW", 5)
-	viper.SetDefault("LOG_LEVEL", "info")
-	viper.SetDefault("NONCE_STORE", "memory")
-	viper.SetDefault("ALLOWED_NETWORKS", "")
+	v.SetDefault("SECRET", "")
+	v.SetDefault("TOKEN_TTL", 60)
+	v.SetDefault("TOKEN_EXPIRY_SKEW", 5)
+	v.SetDefault("LOG_LEVEL", "info")
+	v.SetDefault("NONCE_STORE", "memory")
+	v.SetDefault("ALLOWED_NETWORKS", "")
 
 	// TODO: Testing, remove default in production
-	viper.SetDefault("ADMINS", []string{})
+	v.SetDefault("ADMINS", []string{})
 
-	viper.SetDefault("USER_AUTH_TTL", 8) // 8 days
+	v.SetDefault("USER_AUTH_TTL", 8) // 8 days
 
-	viper.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
-	viper.SetDefault("BASE_URL", "/")
+	v.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
+	v.SetDefault("BASE_URL", "/")
 
 	// Email defaults
-	viper.SetDefault("EMAIL_HOST", "host.docker.internal")
-	viper.SetDefault("EMAIL_PORT", "25")
-	viper.SetDefault("EMAIL_USERNAME", "")
-	viper.SetDefault("EMAIL_PASSWORD", "")
-	viper.SetDefault("EMAIL_FROM", "noreply@example.com")
+	v.SetDefault("EMAIL_HOST", "host.docker.internal")
+	v.SetDefault("EMAIL_PORT", "25")
+	v.SetDefault("EMAIL_USERNAME", "")
+	v.SetDefault("EMAIL_PASSWORD", "")
+	v.SetDefault("EMAIL_FROM", "noreply@example.com")
 
 	var accessListFolder string
 	// If running in Docker, use /app/instance, otherwise use ./instance relative to cwd
@@ -89,12 +102,12 @@ func LoadConfig() (*Config, error) {
 		accessListFolder = fmt.Sprintf("%s/instance/", cwd)
 	}
 
-	viper.SetDefault("ACCESS_LIST_FOLDER", accessListFolder) // Default folder for access lists
+	v.SetDefault("ACCESS_LIST_FOLDER", accessListFolder) // Default folder for access lists
 
 	// Load configuration from environment variables
-	viper.AutomaticEnv()
+	v.AutomaticEnv()
 
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode into struct: %v", err)
 	}
 
