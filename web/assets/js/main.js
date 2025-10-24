@@ -5,32 +5,14 @@ import { loadConfig } from "./app.js";
 
 let config = {};
 
+// Load configuration
 const config_promise = loadConfig().then(cfg => {
-    config = cfg;
-    console.log("Config loaded:", config);
+    config = cfg;  // Store config globally
 
-    // Fetch QR code and support contact info from config
-    if (config.SupportQRURL) {
-        // Fetch and cache the support QR code image
-        fetch(config.SupportQRURL).then(response => {
-            if (response.ok) {
-                return response.blob();
-            } else {
-                throw new Error(`Failed to fetch support QR code: ${response.statusText}`);
-            }
-        }).then(blob => {
-            const qrUrl = URL.createObjectURL(blob);
-            localStorage.setItem('support_qr_url', qrUrl);
-            console.log("Support QR code cached");
-        }).catch(err => {
-            console.error("Error fetching support QR code:", err);
-        });
-
-        // Store support contact info
-        if (config.SupportContact) {
-            localStorage.setItem('support_contact', config.SupportContact);
-            console.log("Support contact info cached");
-        }
+    // Store support contact info
+    if (config.SupportContact) {
+        localStorage.setItem('support_contact', config.SupportContact);
+        console.log("Support contact info cached");
     }
 }).catch(err => {
     console.error("Failed to load config:", err);
@@ -49,7 +31,7 @@ function run() {
 
     // TODO: Fix the error handler to use latest support info from config
     let errorOptions = {
-        supportQRUrl: localStorage.getItem('support_qr_url') || '/dist/assets/support_qr.png',
+        supportQRUrl: '/dist/assets/support_qr.png',
         supportContact: localStorage.getItem('support_contact') || config.SupportURL || 'Technical Support',
         autoShow: true // Automatically show overlay when errors are added
     };
