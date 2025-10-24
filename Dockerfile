@@ -51,6 +51,8 @@ FROM mcr.microsoft.com/devcontainers/go:${GO_VERSION}-${DEBIAN_VERSION} AS dev
 
 ARG DIST_DIR
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD [ "curl", "-f", "http://localhost:8080/api/v1/health" ] || exit 1
+
 WORKDIR /app
 
 # Default anonymous volume for compiled stuff
