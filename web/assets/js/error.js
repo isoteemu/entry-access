@@ -202,7 +202,7 @@ export class ErrorHandler {
                             <!-- QR Code -->
                             <div class="flex justify-center">
                                 <div class="bg-white p-4">
-                                    <img src="${this.config.supportQRUrl}" alt="Support QR Code" class="w-48 h-48" id="support-qr-image">
+                                    <img src="${this.config.supportQRUrl}" alt="Support QR Code: ${this.config.supportQRUrl}" class="w-48 h-48" id="support-qr-image">
                                 </div>
                             </div>
 
