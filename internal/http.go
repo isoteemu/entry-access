@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	. "entry-access-control/internal/config"
@@ -13,6 +14,7 @@ import (
 
 	routes "entry-access-control/internal/routes"
 
+	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
 )
 
@@ -104,6 +106,32 @@ func GetBaseURL(c *gin.Context) string {
 	return c.MustGet("BaseURL").(string)
 }
 
+// Multitemplate renderer to support layouts
+// Copied from gin-contrib/multitemplate/example/advanced/example.go
+func createRenderer(templateDir string) multitemplate.Renderer {
+	r := multitemplate.NewRenderer()
+
+	layouts, err := filepath.Glob(templateDir + "/layouts/*.html.tmpl")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	includes, err := filepath.Glob(templateDir + "/*.html.tmpl")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Generate our templates map from our layouts/ and includes/ directories
+	for _, include := range includes {
+		layoutCopy := make([]string, len(layouts))
+		copy(layoutCopy, layouts)
+		files := append(layoutCopy, include)
+		slog.Info("Loading template", "template", include, "with_layouts", layoutCopy)
+		r.AddFromFiles(filepath.Base(include), files...)
+	}
+	return r
+}
+
 func HTTPServer() *gin.Engine {
 	r := gin.Default()
 
@@ -137,16 +165,18 @@ func HTTPServer() *gin.Engine {
 	})
 
 	// Load HTML templates
-	r.LoadHTMLGlob("web/templates/*")
+	r.HTMLRender = createRenderer("web/templates")
 
 	// --- Routes ---
 	// Serve config for client-side use
 	r.GET("/config.json", func(c *gin.Context) {
 		// Provide a initial config
+		SupportQRURL := UrlFor(c, "dist/assets/support_qr.png")
 		var clientCfg = gin.H{
 			"TokenTTL":        Cfg.TokenTTL,
 			"TokenExpirySkew": Cfg.TokenExpirySkew,
 			"SupportURL":      Cfg.SupportURL,
+			"SupportQRURL":    SupportQRURL,
 		}
 
 		c.JSON(http.StatusOK, clientCfg)
