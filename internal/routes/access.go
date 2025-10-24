@@ -1,6 +1,7 @@
 package routes
 
 import (
+	access "entry-access-control/internal/access"
 	. "entry-access-control/internal/jwt"
 	"fmt"
 	"log"
@@ -73,6 +74,23 @@ func getEntryToken(entryID string) (string, error) {
 		entryTokens.tokens[entryID] = token
 	}
 	return token, nil
+}
+
+func userExists(c *gin.Context, userID string) (bool, error) {
+	accessListIface, exists := c.Get("AccessList")
+	if !exists {
+		return false, fmt.Errorf("access list not found in context")
+	}
+	accessList, ok := accessListIface.(access.AccessList)
+	if !ok {
+		return false, fmt.Errorf("invalid access list type in context")
+	}
+
+	_, err := accessList.Find(userID)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func EntryRoute(r *gin.RouterGroup) {

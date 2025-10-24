@@ -10,9 +10,11 @@ import (
 	"strings"
 
 	. "entry-access-control/internal"
+	"entry-access-control/internal/access"
 	. "entry-access-control/internal/config"
 	. "entry-access-control/internal/utils"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	qrcode "github.com/skip2/go-qrcode"
 )
@@ -37,7 +39,6 @@ func InitLogger(cfg *Config) *slog.Logger {
 		level = slog.LevelInfo
 		println("Invalid log level in config, defaulting to INFO")
 	}
-
 	handlerOpts := &slog.HandlerOptions{
 		Level:     level,
 		AddSource: level <= slog.LevelDebug,
@@ -88,8 +89,12 @@ func main() {
 	// Initialize HTTP server
 	server := HTTPServer()
 
-	// // Load access lists
-	// accessList := access.NewAccessList("csv")
+	// Initialize access list and inject into Gin context
+	accessList := access.NewAccessList("csv", Cfg)
+	server.Use(func(c *gin.Context) {
+		c.Set("AccessList", accessList)
+		c.Next()
+	})
 
 	server.Run()
 }
