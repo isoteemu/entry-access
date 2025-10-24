@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
+	sloggin "github.com/samber/slog-gin"
 )
 
 func securityHeaders(c *gin.Context) {
@@ -133,7 +134,7 @@ func createRenderer(templateDir string) multitemplate.Renderer {
 }
 
 func HTTPServer() *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
 
 	r.Static("/assets/", "./web/assets/")
 	r.Static("/dist/assets", "./dist/assets") // Serve compiled CSS and fonts
@@ -154,6 +155,11 @@ func HTTPServer() *gin.Engine {
 
 	r.Use(securityHeaders)
 	r.Use(BaseUrlMiddleware(Cfg.BaseURL))
+
+	// Initialize logger
+	logger := slog.Default().WithGroup("gin")
+	r.Use(sloggin.NewWithConfig(logger, sloggin.Config{}))
+	r.Use(gin.Recovery())
 
 	// Inject the HTML renderer into the context for access in handlers
 	// This allows rendering templates in sub-packages

@@ -13,9 +13,7 @@ import (
 	. "entry-access-control/internal/config"
 	. "entry-access-control/internal/utils"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	sloggin "github.com/samber/slog-gin"
 	qrcode "github.com/skip2/go-qrcode"
 )
 
@@ -41,12 +39,14 @@ func InitLogger(cfg *Config) *slog.Logger {
 	}
 
 	handlerOpts := &slog.HandlerOptions{
-		Level: level,
+		Level:     level,
+		AddSource: level <= slog.LevelDebug,
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, handlerOpts))
 	slog.SetDefault(logger)
 
+	slog.Debug("Logger initialized", "level", level.String())
 	return logger
 }
 
@@ -78,7 +78,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	logger := InitLogger(Cfg)
+	InitLogger(Cfg)
 	InitNonceStore(Cfg)
 
 	if Cfg.SupportURL != "" {
@@ -88,8 +88,8 @@ func main() {
 	// Initialize HTTP server
 	server := HTTPServer()
 
-	// Add logging middleware
-	server.Use(sloggin.New(logger), gin.Recovery())
+	// // Load access lists
+	// accessList := access.NewAccessList("csv")
 
 	server.Run()
 }
