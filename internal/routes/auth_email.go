@@ -242,21 +242,30 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		if err := access.ValidEmail(emailAddr); err != nil {
 			switch err {
 			case access.ErrMissingEmail:
-				slog.Warn("Email is missing", "email", emailAddr, "ip", c.ClientIP())
+				slog.Warn("Email is missing", "email", emailAddr)
 				loginErr(c, 400, "Email is required")
 			case access.ErrInvalidEmail:
-				slog.Warn("Email is invalid", "email", emailAddr, "ip", c.ClientIP())
+				slog.Warn("Email is invalid", "email", emailAddr)
 				loginErr(c, 400, "Invalid email format")
 			default:
-				slog.Error("Failed to validate email", "error", err, "email", emailAddr, "ip", c.ClientIP())
+				slog.Error("Failed to validate email", "error", err, "email", emailAddr)
 				loginErr(c, 500, "Internal server error")
 			}
 			return
 		}
 
+		// Get user ID from access list
+		if user, err := userExists(c, emailAddr); err != nil {
+			slog.Warn("User not found", "email", emailAddr)
+			loginErr(c, http.StatusUnauthorized, "User not found")
+			return
+		} else {
+			slog.Debug("User found in access list", "email", emailAddr, "userID", user)
+		}
+
 		// TODO: Check if user can access the entry
 		// if !access.CanAccessEntry(userId, entryId) {
-		// 	slog.Warn("User does not have access to the entry", "email", email, "entryId", entryId, "ip", c.ClientIP())
+		// 	slog.Warn("User does not have access to the entry", "email", email, "entryId", entryId)
 		// 	c.HTML(403, "email_login.html.tmpl", gin.H{"error": "You do not have access to this entry"})
 		// 	return
 		// }
@@ -548,8 +557,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 
 		slog.Info("User clicked email link", "email", emailClaim.Email)
 
-		// If the claim has AuthenticateOnly set, log the user in directly. Otherwise,
-		// just mark the claim as verified for polling to detect.
+		// If the claim has AuthenticateOnly set, login user only and show success page
 		if emailClaim.AuthenticateOnly {
 			login(c, *emailClaim)
 			entryID := emailClaim.EntryID
@@ -560,6 +568,8 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			// Store the ID of the clicked link to allow polling to detect it
 			ttl := time.Duration(emailClaim.ExpiresAt.Unix()-time.Now().UTC().Unix()) * time.Second
 			emailLoginVerifyStore.Put(c.Request.Context(), emailClaim.ID, ttl)
+
+			//
 		}
 
 		// TODO: Check the entry attempted to access
