@@ -40,11 +40,11 @@ func InitLogger(cfg *Config) *slog.Logger {
 		println("Invalid log level in config, defaulting to INFO")
 	}
 	handlerOpts := &slog.HandlerOptions{
-		Level:     level,
-		AddSource: level <= slog.LevelDebug,
+		Level: level,
+		//AddSource: level <= slog.LevelDebug,
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, handlerOpts))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, handlerOpts))
 	slog.SetDefault(logger)
 
 	slog.Debug("Logger initialized", "level", level.String())
@@ -92,9 +92,12 @@ func main() {
 	// Initialize access list and inject into Gin context
 	accessList := access.NewAccessList("csv", Cfg)
 	server.Use(func(c *gin.Context) {
+		slog.Debug("Injecting access list into context")
 		c.Set("AccessList", accessList)
 		c.Next()
 	})
+
+	RegisterRoutes(server)
 
 	server.Run()
 }

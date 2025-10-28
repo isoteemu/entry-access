@@ -16,7 +16,6 @@ import (
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
-	sloggin "github.com/samber/slog-gin"
 )
 
 const API_V1_PREFIX = "/api/v1"
@@ -129,7 +128,7 @@ func createRenderer(templateDir string) multitemplate.Renderer {
 		layoutCopy := make([]string, len(layouts))
 		copy(layoutCopy, layouts)
 		files := append(layoutCopy, include)
-		slog.Info("Loading template", "template", include, "with_layouts", layoutCopy)
+		slog.Debug("Loading template", "template", include, "with_layouts", layoutCopy)
 		r.AddFromFiles(filepath.Base(include), files...)
 	}
 	return r
@@ -158,10 +157,16 @@ func HTTPServer() *gin.Engine {
 	r.Use(securityHeaders)
 	r.Use(BaseUrlMiddleware(Cfg.BaseURL))
 
-	// Initialize logger
-	logger := slog.Default().WithGroup("gin")
-	r.Use(sloggin.NewWithConfig(logger, sloggin.Config{}))
-	r.Use(gin.Recovery())
+	/*
+		// Initialize logger
+		logger := slog.Default().WithGroup("http").
+			With("gin_mode", gin.Mode())
+
+		r.Use(sloggin.NewWithConfig(logger, sloggin.Config{
+			HandleGinDebug: true,
+		}))
+		r.Use(gin.Recovery())
+	*/
 
 	// Inject the HTML renderer into the context for access in handlers
 	// This allows rendering templates in sub-packages
@@ -175,6 +180,10 @@ func HTTPServer() *gin.Engine {
 	// Load HTML templates
 	r.HTMLRender = createRenderer("web/templates")
 
+	return r
+}
+
+func RegisterRoutes(r *gin.Engine) *gin.Engine {
 	// --- Routes ---
 	// Serve config for client-side use
 	r.GET("/config.json", func(c *gin.Context) {
