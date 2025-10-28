@@ -1,5 +1,12 @@
 package access
 
+// Usage:
+//  accessList := access.NewAccessList("csv")
+//  user, _ := accessList.Find("user@example.com")
+//  if user != nil && user.CanAccess("entryID") {
+//      // Access granted
+//  }
+
 import (
 	"encoding/csv"
 	. "entry-access-control/internal/config"
@@ -68,16 +75,41 @@ func (s *StudentEntry) CanAccess(EntryID string) bool {
 }
 
 type AccessList interface {
-	// stores a nonce with a TTL.
-	Find(EntryID string) (EntryRecord, error)
-	// Returns true if the nonce existed (valid request), false otherwise.
+	Find(UserID string) (EntryRecord, error)
 }
 
-func NewAccessList(typ string) AccessList {
+func NewAccessList(typ string, cfg *Config) AccessList {
 	switch typ {
 	case "csv":
-		csv := NewCSVAccessList()
-		return csv
+		_logger := slog.Default().WithGroup("access").With("type", "csv")
+		files, err := getLists(cfg)
+		if err != nil {
+			_logger.Error("getLists failed", "error", err)
+			return nil
+		}
+		if len(files) < 1 {
+			_logger.Warn("Expected one or more CSV files", "folder", cfg.AccessListFolder)
+		}
+
+		accessList := NewCSVAccessList()
+		for _, file := range files {
+			_logger.Debug("Adding CSV file", "file", file)
+			err := accessList.AddFile(file)
+			if err != nil {
+				_logger.Error("AddFile failed", "file", file, "error", err)
+				return nil
+			}
+		}
+
+		// For debug, print number of entries
+		accessList.mu.RLock()
+		numReaders := len(accessList.csvReaders)
+		_logger.Info("CSV access list initialized", "num_files", numReaders)
+		for file, reader := range accessList.csvReaders {
+			_logger.Info("CSV file loaded", "file", file, "language", reader.FieldDefinitions.Language)
+		}
+		accessList.mu.RUnlock()
+		return accessList
 	default:
 		return nil
 	}
@@ -96,10 +128,12 @@ type CSVAccessList struct {
 	csvReaders map[string]*CSVFile
 }
 
-// From entry lists, find if student with EntryID exists
-func (s *CSVAccessList) Find(EntryID string) (EntryRecord, error) {
+// From entry lists, find if student with UserID exists
+func (s *CSVAccessList) Find(UserID string) (EntryRecord, error) {
+	slog.Debug("Finding user in CSV access list", "user_id", UserID)
 	for _, reader := range s.csvReaders {
-		// Search each CSV reader for the EntryID
+		slog.Debug("Searching CSV file for user", "user_id", UserID, "language", reader.FieldDefinitions.Language)
+		// Search each CSV reader for the UserID
 		// If found, return the corresponding EntryRecord
 		for {
 			record, err := reader.Read()
@@ -116,7 +150,7 @@ func (s *CSVAccessList) Find(EntryID string) (EntryRecord, error) {
 			for i, field := range record {
 				if i == reader.HeaderMap[reader.FieldDefinitions.EmailField] {
 					// Compare case-insensitively
-					if strings.EqualFold(strings.TrimSpace(field), strings.TrimSpace(EntryID)) {
+					if strings.EqualFold(strings.TrimSpace(field), strings.TrimSpace(UserID)) {
 						// Found the entry, check status if applicable
 						status := false
 						if reader.HeaderMap[reader.FieldDefinitions.StatusField] != -1 {
