@@ -1,0 +1,52 @@
+{{define "title"}}Entry{{end}}
+
+{{define "head"}}
+    <!-- Additional head content can be added here -->
+{{end}}
+
+{{define "footer-content"}}
+    <div class="flex justify-between items-center">
+        <div class="text-sm text-gray-400 dark:text-gray-500">
+            &copy; {{.CurrentYear}} University of Jyväskylä.
+        </div>
+    </div>
+{{end}}
+
+{{define "scripts"}}
+    <!-- Additional scripts can be added here -->
+{{end}}
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{template "title" .}}</title>
+    {{ if .BaseURL }}<base href="{{ .BaseURL }}">{{ end }}
+
+    <!-- Style -->
+    <link href="/dist/assets/css/output.css" rel="stylesheet">
+    <link href="/assets/css/jyu.css" rel="stylesheet">
+    <link rel="icon" href="//www.jyu.fi/themes/custom/jyu/favicon.ico" type="image/vnd.microsoft.icon">
+
+    <!-- Prefetch Error QR -->
+    <link rel="prefetch" href="/dist/assets/support_qr.png" as="image">
+    <link rel="prefetch" href="/config.json" as="fetch">
+
+    <!-- No Robots, thanks -->
+    <meta name="robots" content="noindex, nofollow, noarchive">
+
+    <script type="module">import * as main from '/assets/js/main.js';</script>
+
+    {{template "head" .}}
+</head>
+<body class="min-h-screen h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-300 transition-colors duration-200">
+    <div class="container mx-auto px-4 py-8">
+        {{template "content" .}}
+    </div>
+    <footer class="container mx-auto border-t border-gray-200 dark:border-gray-700 mt-12 pt-8">
+        {{template "footer-content" .}}
+    </footer>
+    {{template "scripts" .}}
+</body>
+</html>
