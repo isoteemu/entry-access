@@ -19,6 +19,10 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
+const ERR_CODES = g.H{
+	"AUTH_500": "Internal server error during authentication",
+}
+
 func genEntryToken(entryID string) (string, error) {
 	claim := NewEntryClaim(entryID)
 	return GenerateJWT(claim)
@@ -79,6 +83,7 @@ func getEntryToken(entryID string) (string, error) {
 func userExists(c *gin.Context, userID string) (bool, error) {
 	accessListIface, exists := c.Get("AccessList")
 	if !exists {
+		slog.Warn("Access list not found in context")
 		return false, fmt.Errorf("access list not found in context")
 	}
 	accessList, ok := accessListIface.(access.AccessList)
@@ -91,6 +96,18 @@ func userExists(c *gin.Context, userID string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func errorPage(c *gin.Context, code int, message string) {
+	// Check if message is in error codes
+	_message, exists := ERR_CODES[message]
+	if exists {
+		message = _message.(string)
+	}
+	// TODO: Implement error page
+	c.JSON(code, gin.H{
+		"error": message,
+	})
 }
 
 func EntryRoute(r *gin.RouterGroup) {
@@ -143,6 +160,7 @@ func EntryRoute(r *gin.RouterGroup) {
 		}))
 	})
 
+	// Router to decide if authentication is needed, or directly grant access
 	r.GET("/:token", func(c *gin.Context) {
 		if err, _ := checkProvisioning(c); err != nil {
 			log.Printf("Provisioning check failed: %v", err)
@@ -151,6 +169,35 @@ func EntryRoute(r *gin.RouterGroup) {
 		}
 
 		token := c.Param("token")
+
+		// Verify token
+		claim, err := DecodeEntryJWT(token)
+		if err != nil {
+			slog.Debug("Invalid entry token", "error", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid entry token"})
+			return
+		}
+
+		slog.Info("Entry token used", "entryID", claim.EntryID)
+		// TODO: Rotate QR code
+
+		// Check if user is logged in
+		userID, err := verifyAuth(c)
+		if err != nil {
+			slog.Error("Failed to verify auth token", "error", err)
+			errorPage(c, http.StatusUnauthorized, "Failed to verify auth token")
+		}
+
+		exists, err := userExists(c, userID)
+		if err != nil || !exists {
+			slog.Warn("User has authenticated, but not found in access list", "userID", userID, "error", err, "exists", exists)
+			// Destroy the token to avoid reuse
+			AuthLogout(c)
+			return
+		}
+		slog.Debug("User authenticated and found in access list", "userID", userID)
+
+		// TODO: Check for access permissions
 
 		c.JSON(http.StatusOK, gin.H{"token": token})
 	})
