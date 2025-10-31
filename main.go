@@ -1,7 +1,5 @@
 package main
 
-// https://www.golinuxcloud.com/golang-jwt/
-
 import (
 	"fmt"
 	"log"
@@ -9,20 +7,17 @@ import (
 	"os"
 	"strings"
 
-	. "entry-access-control/internal"
-	"entry-access-control/internal/access"
-	. "entry-access-control/internal/config"
-	. "entry-access-control/internal/utils"
+	"entry-access-control/cmd"
+	"entry-access-control/internal/config"
+	"entry-access-control/internal/storage"
 
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	qrcode "github.com/skip2/go-qrcode"
 )
 
 const DIST_DIR = "dist"
 
 // Initialize logger
-func InitLogger(cfg *Config) *slog.Logger {
+func InitLogger(cfg *config.Config) *slog.Logger {
 
 	// Determine level from config and set it on the handler options.
 	var level slog.Level
@@ -51,9 +46,20 @@ func InitLogger(cfg *Config) *slog.Logger {
 	return logger
 }
 
+func InitStorage(cfg *config.Config) (storageProvider storage.Provider, err error) {
+	storageProvider = storage.NewProvider(&cfg.Storage)
+	if storageProvider == nil {
+		err = fmt.Errorf("failed to initialize storage provider")
+		return nil, err
+	}
+
+	slog.Info("Storage provider initialized")
+	return storageProvider, nil
+}
+
 // Generate static QR code for support
 func genSupportQr(url string) {
-	qrCode, err := qrcode.Encode(url, qrcode.Medium, QR_IMAGE_SIZE)
+	qrCode, err := qrcode.Encode(url, qrcode.Medium, config.QR_IMAGE_SIZE)
 	if err != nil {
 		log.Fatalf("Error generating support QR code: %v", err)
 	}
@@ -69,35 +75,9 @@ func genSupportQr(url string) {
 }
 
 func main() {
-	// Load config
-	var err error
-
-	godotenv.Load()
-
-	Cfg, err = LoadConfig()
-	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+	// If no arguments provided, default to running the server
+	if len(os.Args) == 1 {
+		os.Args = append(os.Args, "server")
 	}
-
-	InitLogger(Cfg)
-	InitNonceStore(Cfg)
-
-	if Cfg.SupportURL != "" {
-		genSupportQr(Cfg.SupportURL)
-	}
-
-	// Initialize HTTP server
-	server := HTTPServer()
-
-	// Initialize access list and inject into Gin context
-	accessList := access.NewAccessList("csv", Cfg)
-	server.Use(func(c *gin.Context) {
-		slog.Debug("Injecting access list into context")
-		c.Set("AccessList", accessList)
-		c.Next()
-	})
-
-	RegisterRoutes(server)
-
-	server.Run()
+	cmd.Execute()
 }
