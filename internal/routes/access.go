@@ -19,7 +19,7 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
-const ERR_CODES = g.H{
+var ERR_CODES = gin.H{
 	"AUTH_500": "Internal server error during authentication",
 }
 
