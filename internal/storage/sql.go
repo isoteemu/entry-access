@@ -47,7 +47,6 @@ func NewSQLProvider(config *config.Storage, driverName string, dataSource string
 
 	provider = &SQLProvider{
 		db:     db,
-		config: config,
 		logger: logger,
 
 		Queries: defaultQueries(),
@@ -100,7 +99,15 @@ func (p *SQLProvider) runMigrations(driverName string) error {
 		return err
 	}
 
-	targetVersion := -1 // Run all available migrations
+	targetVersion, err := runner.GetLatestMigrationVersion()
+	if err != nil {
+		return err
+	}
+
+	if currentVersion == targetVersion {
+		p.logger.Info("Database schema is up to date", "version", currentVersion)
+		return nil
+	}
 
 	migrations, err := runner.LoadMigrations(currentVersion, targetVersion)
 	if err != nil {
