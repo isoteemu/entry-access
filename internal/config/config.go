@@ -66,28 +66,9 @@ func LoadConfig() (*Config, error) {
 	v.AddConfigPath(".")
 	v.SetEnvPrefix("")
 
-	// Set defaults. Defaults needs to be defined for config fields to be populated from env.
-	v.SetDefault("SECRET", "")
-	v.SetDefault("TOKEN_TTL", 60)
-	v.SetDefault("TOKEN_EXPIRY_SKEW", 5)
-	v.SetDefault("LOG_LEVEL", "info")
-	v.SetDefault("NONCE_STORE", "memory")
-	v.SetDefault("ALLOWED_NETWORKS", "")
-
-	// TODO: Testing, remove default in production
-	v.SetDefault("ADMINS", []string{})
-
-	v.SetDefault("USER_AUTH_TTL", 8) // 8 days
-
-	v.SetDefault("SUPPORT_URL", DEFAULT_SUPPORT_URL)
-	v.SetDefault("BASE_URL", "/")
-
-	// Email defaults
-	v.SetDefault("EMAIL_HOST", "host.docker.internal")
-	v.SetDefault("EMAIL_PORT", "25")
-	v.SetDefault("EMAIL_USERNAME", "")
-	v.SetDefault("EMAIL_PASSWORD", "")
-	v.SetDefault("EMAIL_FROM", "noreply@example.com")
+	for k, val := range Defaults() {
+		v.SetDefault(k, val)
+	}
 
 	var accessListFolder string
 	// If running in Docker, use /app/instance, otherwise use ./instance relative to cwd
@@ -116,6 +97,13 @@ func LoadConfig() (*Config, error) {
 		maxSkew := cfg.TokenTTL / 2
 		slog.Warn("TOKEN_EXPIRY_SKEW must be at most 0.5 * TOKEN_TTL", slog.Int("actual", int(cfg.TokenExpirySkew)), slog.Int("max", int(maxSkew)))
 		cfg.TokenExpirySkew = maxSkew
+	}
+
+	// Convert relative storage path to absolute
+	if cfg.Storage.SQLite != nil {
+		if !os.IsPathSeparator(cfg.Storage.SQLite.Path[0]) {
+			cfg.Storage.SQLite.Path = fmt.Sprintf("%s/%s", getConfigPath(), cfg.Storage.SQLite.Path)
+		}
 	}
 
 	// Warn if secret is missing - this is a critical security setting for production
