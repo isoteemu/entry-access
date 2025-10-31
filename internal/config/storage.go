@@ -1,7 +1,7 @@
 package config
 
 type Storage struct {
-	SQLite *SQLLiteStorage `mapstructure:"local,omitempty"`
+	SQLite *SQLLiteStorage `mapstructure:"sqlite,omitempty"`
 	// PostgreSQL *StoragePostgreSQL `mapstructure:"postgresql,omitempty"`
 }
 

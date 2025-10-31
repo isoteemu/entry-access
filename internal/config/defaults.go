@@ -15,14 +15,19 @@ var defaults = map[string]any{
 	"support_url":   DEFAULT_SUPPORT_URL,
 	"base_url":      "/",
 
-	"email.host":     "host.docker.internal",
-	"email.port":     "25",
-	"email.username": "",
-	"email.password": "",
-	"email.from":     "noreply@example.com",
+	"Storage": map[string]any{
+		"SQLite": map[string]any{
+			"Path": "./storage.db",
+		},
+	},
 
-	"storage.type":        "sqlite",
-	"storage.sqlite.path": "./data/storage.db",
+	"Email": map[string]any{
+		"Host":     "host.docker.internal",
+		"Port":     25,
+		"Username": "",
+		"Password": "",
+		"From":     "noreply@example.com",
+	},
 }
 
 func Defaults() map[string]any {
