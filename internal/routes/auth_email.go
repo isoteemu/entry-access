@@ -389,6 +389,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Writer.Header().Set("Connection", "keep-alive")
 		c.Writer.Header().Set("Transfer-Encoding", "chunked") // Important for streaming
+		c.Writer.Header().Set("X-Accel-Buffering", "no")      // Disable buffering for Nginx
 
 		c.Writer.WriteHeader(http.StatusOK)
 
