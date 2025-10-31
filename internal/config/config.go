@@ -101,9 +101,11 @@ func LoadConfig() (*Config, error) {
 		cfg.TokenExpirySkew = maxSkew
 	}
 
-	// Convert relative storage path to absolute
+	// Convert relative sqlite path to absolute instance folder
 	if cfg.Storage.SQLite != nil {
-		if !os.IsPathSeparator(cfg.Storage.SQLite.Path[0]) {
+		if cfg.Storage.SQLite.Path == ":memory:" {
+			// In-memory database, do nothing
+		} else if !os.IsPathSeparator(cfg.Storage.SQLite.Path[0]) {
 			cfg.Storage.SQLite.Path = fmt.Sprintf("%s/%s", getConfigPath(), cfg.Storage.SQLite.Path)
 		}
 	}
