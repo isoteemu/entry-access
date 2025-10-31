@@ -35,6 +35,8 @@ type Config struct {
 	BaseURL    string `mapstructure:"base_url"` // Base URL for the application. May be relative, e.g. /entry-acces/, or absolute, e.g. https://example.com/entry-access/
 	SupportURL string `mapstructure:"support_url"`
 
+	Storage Storage `mapstructure:"storage"`
+
 	// Email login configuration
 	Email email.SMTPConfig `mapstructure:",squash"`
 }
