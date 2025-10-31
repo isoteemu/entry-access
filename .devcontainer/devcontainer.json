@@ -11,7 +11,8 @@
     "workspaceFolder": "/app",
     "mounts": [
         "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-        "source=${localWorkspaceFolder},target=/app,type=bind"
+        "source=${localWorkspaceFolder},target=/app,type=bind",
+		"source=/etc/localtime,target=/etc/localtime,type=bind,consistency=cached"
 	],
 	"customizations": {
 		"vscode": {
