@@ -13,10 +13,17 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type SQL = string
+
 type Queries struct {
-	GetExistingTables      string
-	GetLatestSchemaVersion string
-	InsertMigration        string
+	GetExistingTables      SQL
+	GetLatestSchemaVersion SQL
+	InsertMigration        SQL
+
+	// --- Entry-related queries ---
+	ListEntries SQL
+	CreateEntry SQL
+	DeleteEntry SQL
 }
 
 type SQLProvider struct {
@@ -33,6 +40,11 @@ func defaultQueries() Queries {
 		// GetExistingTables:      "",
 		GetLatestSchemaVersion: "SELECT COALESCE(MAX(version_after), 0) FROM migrations",
 		InsertMigration:        "INSERT INTO migrations (applied_at, version_before, version_after, application_version) VALUES (?, ?, ?, ?)",
+
+		// --- Entry-related queries ---
+		ListEntries: "SELECT id, name, created_at FROM entryways WHERE deleted_at IS NULL ORDER BY created_at DESC",
+		CreateEntry: "INSERT INTO entryways (name, created_at) VALUES (?, ?)",
+		DeleteEntry: "UPDATE entryways SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
 	}
 }
 
@@ -167,5 +179,59 @@ func (p *SQLProvider) Close() error {
 	if p.db != nil {
 		return p.db.Close()
 	}
+	return nil
+}
+
+// --- Entry-related methods ---
+func (p *SQLProvider) ListEntries(ctx context.Context) ([]Entry, error) {
+	var entries []Entry
+
+	if err := p.db.SelectContext(ctx, &entries, p.Queries.ListEntries); err != nil {
+		return nil, fmt.Errorf("failed to list entries: %w", err)
+	}
+
+	return entries, nil
+
+}
+
+func (p *SQLProvider) CreateEntry(ctx context.Context, entry Entry) error {
+	createdAt := entry.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
+
+	result, err := p.db.ExecContext(ctx, p.Queries.CreateEntry, entry.Name, createdAt)
+	if err != nil {
+		return fmt.Errorf("failed to create entry: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get last insert id: %w", err)
+	}
+
+	entry.ID = id
+	p.logger.Debug("Entry created", "id", id, "name", entry.Name)
+
+	return nil
+}
+
+func (p *SQLProvider) DeleteEntry(ctx context.Context, entry Entry) error {
+	result, err := p.db.ExecContext(ctx, p.Queries.DeleteEntry, time.Now(), entry.ID)
+	if err != nil {
+		return fmt.Errorf("failed to delete entry: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("entry not found or already deleted: %d", entry.ID)
+	}
+
+	p.logger.Debug("Entry deleted", "id", entry.ID, "name", entry.Name)
+
 	return nil
 }

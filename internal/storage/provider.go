@@ -9,6 +9,11 @@ import (
 type Provider interface {
 	Close() error
 	GetSchemaVersion(ctx context.Context) (int, error)
+
+	// Entry-related methods
+	ListEntries(ctx context.Context) ([]Entry, error)
+	CreateEntry(ctx context.Context, entry Entry) error
+	DeleteEntry(ctx context.Context, entry Entry) error
 }
 
 func NewProvider(config *config.Storage) Provider {
