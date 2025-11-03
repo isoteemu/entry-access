@@ -37,11 +37,11 @@ import (
 
 // SMTPConfig represents an email client configuration
 type SMTPConfig struct {
-	Host     string `mapstructure:"email_host"`
-	Port     string `mapstructure:"email_port"`
-	Username string `mapstructure:"email_username"`
-	Password string `mapstructure:"email_password"`
-	From     string `mapstructure:"email_from"`
+	Host     string `mapstructure:"host"`
+	Port     string `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	From     string `mapstructure:"from"`
 }
 
 // EmailClient represents an email client
