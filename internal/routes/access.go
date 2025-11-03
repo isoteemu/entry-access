@@ -19,10 +19,6 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
-var ERR_CODES = gin.H{
-	"AUTH_500": "Internal server error during authentication",
-}
-
 func genEntryToken(entryID string) (string, error) {
 	claim := NewEntryClaim(entryID)
 	return GenerateJWT(claim)
@@ -96,18 +92,6 @@ func userExists(c *gin.Context, userID string) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-func errorPage(c *gin.Context, code int, message string) {
-	// Check if message is in error codes
-	_message, exists := ERR_CODES[message]
-	if exists {
-		message = _message.(string)
-	}
-	// TODO: Implement error page
-	c.JSON(code, gin.H{
-		"error": message,
-	})
 }
 
 func EntryRoute(r *gin.RouterGroup) {
