@@ -53,7 +53,6 @@ function run() {
         pingMonitor.start();
 
         errorHandler.removeError(networkErrorID);
-
     });
     window.addEventListener('offline', () => {
         console.log("Network is offline");
@@ -86,4 +85,14 @@ function run() {
                 break;
         }
     });
+
+    const appReadyEvent = new CustomEvent('app:ready', {
+        // 'bubbles: true' allows the event to propagate up the DOM tree (useful for elements)
+        bubbles: true, 
+        
+        // 'cancelable: true' allows the event to be cancelled via event.preventDefault()
+        cancelable: false,
+        detail: { config }
+    });
+    document.dispatchEvent(appReadyEvent);
 }
