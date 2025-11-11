@@ -19,13 +19,18 @@ const config_promise = loadConfig().then(cfg => {
 });
 
 document.addEventListener('DOMContentLoaded', async function() {
+    console.group("DOM Loaded, Waiting config to load...");
     await config_promise; // Ensure config is loaded before proceeding
-
-    console.log('DOM ready, running()');
+    console.log("Config loaded:", config);
+    console.groupEnd();
     run();
 });
 
 function run() {
+
+    const pingErrorID = "PING_FAILURE";
+    const networkErrorID = "NETWORK_OFFLINE";
+
     // Initialize your application
     console.log('App starting...');
 
@@ -42,10 +47,7 @@ function run() {
     window.errorHandler = errorHandler;
 
     const pingMonitor = new PingMonitor("/api/v1/health", 3);
-    // TODO: Temporarily disable ping monitoring for testing
-    // pingMonitor.start();
-    const pingErrorID = "ping_error";
-    const networkErrorID = "network_error";
+    pingMonitor.start();
 
     // Listen for online/offline events
     window.addEventListener('online', () => {
