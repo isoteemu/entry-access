@@ -33,10 +33,16 @@ func ProvisioningApi(r *gin.RouterGroup) {
 		// Cache buster
 		cacheBuster := strconv.FormatInt(time.Now().UTC().Unix(), 16)
 
-		qr_url := UrlFor(c, "/api/provision/qr?cb="+cacheBuster)
+		qr_url := UrlFor(c, r.BasePath()+"/qr?cb="+cacheBuster)
 
 		// Render page
 		c.HTML(http.StatusOK, "provisioning.html.tmpl", gin.H{"QRCodeURL": qr_url})
+	})
+
+	r.GET("/test", func(ctx *gin.Context) {
+		url := r.BasePath() + "/device"
+		slog.Info("Provisioning test page accessed", "url", url)
+		errorPage(ctx, http.StatusInternalServerError, "This is a test error page: ")
 	})
 
 	// QR code generation route
@@ -49,7 +55,6 @@ func ProvisioningApi(r *gin.RouterGroup) {
 		// Device ID is provided as query parameter, client IP is taken from request
 		// Client IP is used to restrict provisioning to specific IP.
 		// Note: In production behind proxy, make sure to set GIN_TRUSTED_PROXIES env variable accordingly
-		// or use c.Request.Header.Get("X-Forwarded-For") to get real client IP
 
 		deviceID := c.Query("device_id")
 		clientIP := c.ClientIP()
@@ -67,7 +72,7 @@ func ProvisioningApi(r *gin.RouterGroup) {
 			return
 		}
 
-		provisioningURL := UrlFor(c, "/api/device/authorize?"+token)
+		provisioningURL := UrlFor(c, r.BasePath()+"/authorize?"+token)
 
 		qrCode, err := qrcode.Encode(provisioningURL, qrcode.Medium, QR_IMAGE_SIZE)
 		if err != nil {
@@ -80,4 +85,5 @@ func ProvisioningApi(r *gin.RouterGroup) {
 		c.Header("Cache-Control", fmt.Sprintf("max-age=%d", Cfg.TokenTTL))
 		c.Data(http.StatusOK, "image/png", qrCode)
 	})
+
 }
