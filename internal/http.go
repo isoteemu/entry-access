@@ -220,8 +220,7 @@ func RegisterRoutes(r *gin.Engine) *gin.Engine {
 	routes.AuthRoutes(auth_rg)
 
 	// Email login routes
-	email_rg := auth_rg.Group("/email")
-	routes.EmailLoginRoute(email_rg)
+	routes.EmailLoginRoute(auth_rg)
 
 	// Debug routes
 	routes.RegisterDebugRoutes(r)

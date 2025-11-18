@@ -374,7 +374,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 	})
 
 	// Check if the user has clicked the link or submitted the OTP code
-	r.GET("/status", func(c *gin.Context) {
+	r.GET("/sse", func(c *gin.Context) {
 
 		// Decode JWT token from URL parameter
 		token := c.Query("token")

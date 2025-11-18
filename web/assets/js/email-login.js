@@ -24,7 +24,7 @@ function err(msg) {
 // Using SSE to listen for authentication status updates
 function listenForAuthStatus(token) {
     // Polls for authentication token via Server-Sent Events (SSE)
-    const url = new URL('status', window.location);
+    const url = new URL('sse', window.location);
     url.searchParams.append('token', token);
     url.searchParams.append('cb', Date.now()); // Prevent caching
 
