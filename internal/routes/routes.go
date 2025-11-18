@@ -2,12 +2,15 @@ package routes
 
 import (
 	"encoding/json"
+	"entry-access-control/internal/utils"
 	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
+
+const LOGIN_URL = "/auth/login"
 
 type errorStruct struct {
 	Status  string   `json:"status"`
@@ -42,6 +45,15 @@ func H(c *gin.Context, data any) gin.H {
 	h["BaseURL"] = c.MustGet("BaseURL").(string)
 	h["AppVersion"] = "v0.1.0" // TODO: set app version
 	return h
+}
+
+func loginUrl(c *gin.Context) string {
+	if c.Request.URL.Path == LOGIN_URL {
+		errorPage(c, http.StatusBadRequest, "Already on login page")
+		c.Abort()
+	}
+
+	return utils.UrlFor(c, "/auth/login", gin.H{"next": c.Request.URL.RequestURI()})
 }
 
 // Returns a HTML response with merged data

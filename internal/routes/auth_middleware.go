@@ -11,7 +11,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -176,8 +175,8 @@ func RequireAuth() gin.HandlerFunc {
 		uid, exists := c.Get("userID")
 		if !exists || uid == "" {
 			slog.Warn("RequireAuth: No user ID found in context")
-			next := UrlFor(c, "/auth/login") + "?next=" + url.QueryEscape(c.Request.RequestURI)
-			c.Redirect(http.StatusFound, next)
+			loginPage := loginUrl(c)
+			c.Redirect(http.StatusFound, loginPage)
 			c.Abort()
 			return
 		}

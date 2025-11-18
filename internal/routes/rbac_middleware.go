@@ -10,10 +10,11 @@ import (
 )
 
 // RequirePermission creates middleware that checks for specific permission.
-func RequirePermission(resource, action string) gin.HandlerFunc {
+func RequirePermission(resource, action string, opts ...map[string]interface{}) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
 		userID, err := GetUser(c)
-		if err != ErrUserNotFound {
+		if err != nil && err != ErrUserNotFound {
 			errorPage(c, http.StatusInternalServerError, "Internal server error: "+err.Error())
 			return
 		}
@@ -24,6 +25,23 @@ func RequirePermission(resource, action string) gin.HandlerFunc {
 				"userID", userID,
 				"resource", resource,
 				"action", action)
+
+			// Check if authenticated, redirect to login if not
+			if userID == "" {
+				slog.Warn("Unauthenticated permission attempt",
+					"resource", resource,
+					"action", action)
+
+				loginPage := loginUrl(c)
+				c.Redirect(http.StatusFound, loginPage)
+				c.Abort()
+				return
+			} else {
+				slog.Warn("Permission denied for authenticated user",
+					"userID", userID,
+					"resource", resource,
+					"action", action)
+			}
 
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": "permission denied",
