@@ -8,7 +8,10 @@ import (
 	. "entry-access-control/internal/config"
 	. "entry-access-control/internal/jwt"
 	. "entry-access-control/internal/utils"
+	"errors"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +19,12 @@ import (
 
 const AUTH_COOKIE_NAME = "auth_token"
 
-const AUTH_FAIL_STATUS = 401 // HTTP status code for authentication failure
+const AUTH_FAIL_STATUS = http.StatusUnauthorized // HTTP status code for authentication failure
+
+var (
+	ErrUserNotFound  = errors.New("user not found in context")
+	ErrUserNotString = errors.New("user ID in context is not a string")
+)
 
 // Get authentication TTL in seconds
 func authTTL() uint {
@@ -42,6 +50,20 @@ func setAuthCookie(c *gin.Context, token string) {
 		secure, // Secure
 		true,
 	)
+}
+
+func GetUser(c *gin.Context) (string, error) {
+	// Get user ID from context
+	uid, exists := c.Get("userID")
+	if !exists {
+		return "", ErrUserNotFound
+	}
+	userIdStr, ok := uid.(string)
+	if !ok {
+		slog.Warn("GetUser: User ID in context is not a string")
+		return "", ErrUserNotString
+	}
+	return userIdStr, nil
 }
 
 func NewAuth(c *gin.Context, userId string) error {
@@ -146,13 +168,38 @@ func AuthLogout(c *gin.Context) {
 	)
 }
 
+// RequireAuth creates middleware that requires authentication.
+// Redirects to login page if not authenticated.
+func RequireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Check for existing token
+		uid, exists := c.Get("userID")
+		if !exists || uid == "" {
+			slog.Warn("RequireAuth: No user ID found in context")
+			next := UrlFor(c, "/auth/login") + "?next=" + url.QueryEscape(c.Request.RequestURI)
+			c.Redirect(http.StatusFound, next)
+			c.Abort()
+			return
+		}
+		userIdStr, ok := uid.(string)
+		if !ok {
+			errorPage(c, http.StatusInternalServerError, "Invalid user context")
+			return
+		}
+		slog.Debug("RequireAuth: Authenticated user", "userID", userIdStr)
+		c.Next()
+	}
+}
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check for existing token
 		uid, err := verifyAuth(c)
 		if err != nil {
 			slog.Warn("AuthMiddleware: Invalid or missing auth token", "error", err)
-			c.AbortWithStatus(AUTH_FAIL_STATUS)
+			c.AbortWithStatusJSON(AUTH_FAIL_STATUS, gin.H{
+				"error": "unauthorized",
+			})
 			return
 		}
 
