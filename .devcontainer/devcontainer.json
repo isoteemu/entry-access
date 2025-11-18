@@ -27,7 +27,8 @@
 				"mikestead.dotenv",
 				"esbenp.prettier-vscode",
 				"ms-azuretools.vscode-docker",
-				"bradlc.vscode-tailwindcss"
+				"bradlc.vscode-tailwindcss",
+				"qwtel.sqlite-viewer"
 			]
 		}
 	},
