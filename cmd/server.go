@@ -14,7 +14,6 @@ import (
 	. "entry-access-control/internal/utils"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	qrcode "github.com/skip2/go-qrcode"
 	"github.com/spf13/cobra"
 )
@@ -77,20 +76,50 @@ func genSupportQr(url string) {
 	}
 }
 
-func ServerMain(ctx context.Context, storageProvider storage.Provider) {
-	// Load environment variables
-	godotenv.Load()
+func NewAccessListFromConfig(cfg *config.Config) access.AccessList {
+	// Initialize access list
+	// TODO: Load type from config
+	accessList := access.NewAccessList("csv", cfg)
+	if accessList == nil {
+		slog.Error("Failed to initialize access list")
+		return nil
+	}
+	return accessList
+}
 
-	// Load config
-	var err error
-	config.Cfg, err = config.LoadConfig()
-	if err != nil {
-		slog.Error("Error loading config", "error", err)
+func LoadAccessRBAC(cfg *config.Config) *access.RBAC {
+	// Initialize access list
+	accessList := NewAccessListFromConfig(cfg)
+	if accessList == nil {
+		slog.Error("Failed to initialize access list")
 		os.Exit(1)
 	}
 
+	// Initialize RBAC
+	rbac := access.GetRBAC()
+	if err := rbac.LoadPolicy(config.Cfg.RBAC.PolicyFile); err != nil {
+		slog.Error("Failed to load RBAC policy", "error", err, "file", config.Cfg.RBAC.PolicyFile)
+		os.Exit(1)
+	}
+	// Inject students from access list as "student" role
+	accessListEntries, err := accessList.ListAllEntries()
+	if err != nil {
+		slog.Error("Failed to list access list entries", "error", err)
+		os.Exit(1)
+	}
+	for _, entry := range accessListEntries {
+		rbac.AssignRole(entry.GetUserID(), entry.GetUserRoles()...)
+	}
+	return rbac
+}
+
+func ServerMain(ctx context.Context, storageProvider storage.Provider) {
+
+	if config.Cfg == nil {
+		panic("Config not initialized.")
+	}
+
 	initLogger(config.Cfg)
-	slog.Debug("Configuration loaded", "config", config.Cfg)
 
 	// Use the provider passed from cobra command (already initialized)
 	if storageProvider == nil {
@@ -108,14 +137,15 @@ func ServerMain(ctx context.Context, storageProvider storage.Provider) {
 	// Initialize HTTP server
 	server := HTTPServer()
 
-	// Initialize access list and inject into Gin context
-	accessList := access.NewAccessList("csv", config.Cfg)
+	// Initialize RBAC and access list
+	rbac := LoadAccessRBAC(config.Cfg)
+
+	// Middleware to inject storage provider into context
 	server.Use(func(c *gin.Context) {
-		slog.Debug("Injecting access list into context")
-		c.Set("AccessList", accessList)
+		c.Set("Storage", storageProvider)
 		c.Next()
 	}, func(c *gin.Context) {
-		c.Set("Storage", storageProvider)
+		c.Set("RBAC", rbac)
 		c.Next()
 	})
 

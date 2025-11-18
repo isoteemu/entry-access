@@ -33,6 +33,9 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Set global config
+		config.Cfg = cfg
+
 		// Initialize storage provider
 		provider = storage.NewProvider(&cfg.Storage)
 		if provider == nil {

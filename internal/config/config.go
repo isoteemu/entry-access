@@ -13,6 +13,11 @@ import (
 const DEFAULT_SUPPORT_URL = "https://github.com/isoteemu/entry-access"
 const QR_IMAGE_SIZE = 512
 
+type RBACConfig struct {
+	PolicyFile string   `mapstructure:"policy_file"` // Path to the RBAC policy file
+	Admins     []string `mapstructure:"admins"`      // List of admin emails
+}
+
 type Config struct {
 	// Secret key for signing tokens. Must be set in production.
 	Secret string `mapstructure:"secret"`
@@ -27,7 +32,7 @@ type Config struct {
 	AllowedNetworks  string `mapstructure:"allowed_networks"`
 	AccessListFolder string `mapstructure:"access_list_folder"` // Folder for access list CSVs
 
-	Admins []string `mapstructure:"admins"` // List of admin emails
+	RBAC RBACConfig `mapstructure:"rbac"`
 
 	// User authentication TTL in days.
 	UserAuthTTL uint `mapstructure:"user_auth_ttl"`

@@ -1,0 +1,42 @@
+default_role: "guest"
+
+roles:
+  admin:
+    description: Administrator role with full access
+    permissions:
+      - resource: "*"
+        actions:
+          - "*"
+
+  student:
+    description: Student
+    permissions: []
+
+  teacher:
+    description: Teacher
+    permissions: []
+
+  entrypoint:
+    description: Entrypoint device with provisioning access
+    permissions: 
+      - resource: "provisioning"
+        actions:
+          - "read"
+          - "write"
+
+  guest:
+    description: Guest user with minimal access
+    permissions: []
+
+# Assign roles to specific users
+users:
+  teemu.a.autto@jyu.fi:
+    roles:
+      - admin
+
+# Role inheritance (optional)
+# inheritance:
+#   manager:
+#     - user
+#   user:
+#     - guest

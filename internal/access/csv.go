@@ -1,5 +1,7 @@
 package access
 
+// TODO: Implement Close() method to close opened CSV files
+
 // Usage:
 //  accessList := access.NewAccessList("csv")
 //  user, _ := accessList.Find("user@example.com")
@@ -56,12 +58,14 @@ var CSVListDefinitions = []CSVListDefinition{
 
 type EntryRecord interface {
 	GetUserID() string
+	GetUserRoles() []string
 	CanAccess(EntryID string) bool
 }
 
 type StudentEntry struct {
 	UserID string
 	Email  string
+	Roles  []string
 	Status bool
 }
 
@@ -74,8 +78,22 @@ func (s *StudentEntry) CanAccess(EntryID string) bool {
 	return s.Status
 }
 
+func (s *StudentEntry) GetUserRoles() []string {
+	// return their assigned roles
+	if !s.Status {
+		slog.Warn("Inactive student has no roles", "user_id", s.UserID)
+		return []string{}
+	}
+	// Default role for active students
+	if len(s.Roles) == 0 {
+		return []string{"student"}
+	}
+	return s.Roles
+}
+
 type AccessList interface {
 	Find(UserID string) (EntryRecord, error)
+	ListAllEntries() ([]EntryRecord, error)
 }
 
 func NewAccessList(typ string, cfg *Config) AccessList {
@@ -131,10 +149,30 @@ type CSVAccessList struct {
 // From entry lists, find if student with UserID exists
 func (s *CSVAccessList) Find(UserID string) (EntryRecord, error) {
 	slog.Debug("Finding user in CSV access list", "user_id", UserID)
+
+	entries, err := s.ListAllEntries()
+
+	if err != nil {
+		return nil, fmt.Errorf("error listing all entries: %w", err)
+	}
+
+	for _, user := range entries {
+		if strings.EqualFold(user.GetUserID(), UserID) {
+			slog.Debug("User found in CSV access list", "user_id", UserID)
+			return user, nil
+		}
+	}
+	slog.Debug("User not found in CSV access list", "user_id", UserID)
+	return nil, nil
+}
+
+// List all entries from all CSV files
+func (s *CSVAccessList) ListAllEntries() ([]EntryRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var entries []EntryRecord
 	for _, reader := range s.csvReaders {
-		slog.Debug("Searching CSV file for user", "user_id", UserID, "language", reader.FieldDefinitions.Language)
-		// Search each CSV reader for the UserID
-		// If found, return the corresponding EntryRecord
 		for {
 			record, err := reader.Read()
 			if err == io.EOF {
@@ -149,26 +187,28 @@ func (s *CSVAccessList) Find(UserID string) (EntryRecord, error) {
 
 			for i, field := range record {
 				if i == reader.HeaderMap[reader.FieldDefinitions.EmailField] {
-					// Compare case-insensitively
-					if strings.EqualFold(strings.TrimSpace(field), strings.TrimSpace(UserID)) {
-						// Found the entry, check status if applicable
-						status := false
-						if reader.HeaderMap[reader.FieldDefinitions.StatusField] != -1 {
-							status = strings.TrimSpace(record[reader.HeaderMap[reader.FieldDefinitions.StatusField]]) == reader.FieldDefinitions.ActiveStatus
-							slog.Debug("Found entry in CSV", slog.String("email", field), slog.Bool("status", status), slog.String("status_field", record[reader.HeaderMap[reader.FieldDefinitions.StatusField]]))
-						}
-						entry := &StudentEntry{
-							UserID: field,
-							Email:  field,
-							Status: status,
-						}
-						return entry, nil
+					// Check that the email field is not empty
+					if strings.TrimSpace(field) == "" {
+						continue
 					}
+
+					// Found the entry, check status if applicable
+					status := false
+					if reader.HeaderMap[reader.FieldDefinitions.StatusField] != -1 {
+						status = strings.TrimSpace(record[reader.HeaderMap[reader.FieldDefinitions.StatusField]]) == reader.FieldDefinitions.ActiveStatus
+						slog.Debug("Found entry in CSV", slog.String("email", field), slog.Bool("status", status), slog.String("status_field", record[reader.HeaderMap[reader.FieldDefinitions.StatusField]]))
+					}
+					entry := &StudentEntry{
+						UserID: field,
+						Email:  field,
+						Status: status,
+					}
+					entries = append(entries, entry)
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("entry not found")
+	return entries, nil
 }
 
 func (s *CSVAccessList) RemoveFile(csvFile string) error {
@@ -191,7 +231,7 @@ func (c *CSVAccessList) AddFile(csvFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open CSV file: %w", err)
 	}
-	defer f.Close()
+	//TODO: Close file when destructor called
 
 	// Detect BOM and decode UTF-16 if present. SISU exports UTF-16 with BOM.
 	bom := make([]byte, 2)

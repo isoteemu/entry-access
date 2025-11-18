@@ -10,10 +10,14 @@ var defaults = map[string]any{
 
 	"allowed_networks": "",
 
-	"admins":        []string{},
 	"user_auth_ttl": 8, // 8 days
 	"support_url":   DEFAULT_SUPPORT_URL,
 	"base_url":      "/",
+
+	"RBAC": map[string]any{
+		"policy_file": "./rbac.yaml",
+		"admins":      []string{},
+	},
 
 	"Storage": map[string]any{
 		"SQLite": map[string]any{
