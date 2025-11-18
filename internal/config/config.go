@@ -59,7 +59,7 @@ func getConfigPath() string {
 }
 
 // LoadConfig reads configuration from environment variables and returns a Config struct.
-func LoadConfig() (*Config, error) {
+func LoadConfig(configFile ...string) (*Config, error) {
 	var cfg Config
 
 	v := viper.New()
@@ -67,6 +67,12 @@ func LoadConfig() (*Config, error) {
 	v.AddConfigPath(getConfigPath())
 	v.AddConfigPath(".")
 	v.SetEnvPrefix("")
+
+	if len(configFile) > 0 {
+		for _, path := range configFile {
+			v.SetConfigFile(path)
+		}
+	}
 
 	for k, val := range Defaults() {
 		v.SetDefault(k, val)

@@ -24,8 +24,7 @@ var rootCmd = &cobra.Command{
 		// Initialize configuration
 		var err error
 		if cfgFile != "" {
-			// cfg, err = config.Load(cfgFile)
-			panic("custom config loading not implemented yet")
+			cfg, err = config.LoadConfig(cfgFile)
 		} else {
 			cfg, err = config.LoadConfig()
 		}
