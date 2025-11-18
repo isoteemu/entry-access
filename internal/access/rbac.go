@@ -122,6 +122,15 @@ func (r *RBAC) GetUserRoles(userID string) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	if userID == "" {
+		if r.policy != nil && r.policy.DefaultRole != "" {
+			return []string{r.policy.DefaultRole}
+		} else {
+			slog.Warn("GetUserRoles: empty userID with no default role")
+			return []string{}
+		}
+	}
+
 	directRoles := r.userRoles[userID]
 
 	// If user has no roles and default role is defined, use default role
