@@ -106,13 +106,22 @@ func (p *SQLProvider) GetSchemaVersion(ctx context.Context) (int, error) {
 func (p *SQLProvider) runMigrations(driverName string) error {
 	runner := NewMigrationRunner(driverName)
 
+	previousLogger := p.logger
+	defer func() {
+		p.logger = previousLogger
+	}()
+
+	p.logger = p.logger.With("component", "migration").With("migration_driver", driverName)
+
 	currentVersion, err := p.GetSchemaVersion(context.Background())
 	if err != nil {
+		p.logger.Error("Failed to get current schema version", "error", err)
 		return err
 	}
 
 	targetVersion, err := runner.GetLatestMigrationVersion()
 	if err != nil {
+		p.logger.Error("Failed to get target schema version", "error", err)
 		return err
 	}
 
@@ -123,6 +132,7 @@ func (p *SQLProvider) runMigrations(driverName string) error {
 
 	migrations, err := runner.LoadMigrations(currentVersion, targetVersion)
 	if err != nil {
+		p.logger.Error("Failed to load migrations", "error", err)
 		return err
 	}
 
@@ -148,6 +158,7 @@ func (p *SQLProvider) ApplyMigration(migration SchemaMigration) error {
 
 	// Execute migration SQL
 	if _, err := tx.ExecContext(ctx, migration.SQL); err != nil {
+		p.logger.Error("Failed to execute migration SQL", "error", err, "sql", migration.SQL)
 		return fmt.Errorf("failed to execute migration SQL: %w", err)
 	}
 
@@ -159,6 +170,7 @@ func (p *SQLProvider) ApplyMigration(migration SchemaMigration) error {
 		migration.After(),
 		utils.GetVersion(),
 	); err != nil {
+		p.logger.Error("Failed to insert migration record", "error", err, "sql", p.Queries.InsertMigration)
 		return fmt.Errorf("failed to insert migration record: %w", err)
 	}
 
