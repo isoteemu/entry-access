@@ -119,8 +119,6 @@ func ServerMain(ctx context.Context, storageProvider storage.Provider) {
 		panic("Config not initialized.")
 	}
 
-	initLogger(config.Cfg)
-
 	// Use the provider passed from cobra command (already initialized)
 	if storageProvider == nil {
 		slog.Error("Storage provider is nil")
