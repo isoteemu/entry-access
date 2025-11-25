@@ -13,6 +13,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// txKey is the context key for SQL transactions.
+const txKey = iota
+
 type SQL = string
 
 type Queries struct {
@@ -65,6 +68,34 @@ func NewSQLProvider(config *config.Storage, driverName string, dataSource string
 	}
 
 	return provider
+}
+
+// BeginTx starts a new transaction and returns a new context containing the transaction.
+func (p *SQLProvider) BeginTx(ctx context.Context) (c context.Context, err error) {
+	if tx, err := p.db.BeginTx(ctx, nil); err != nil {
+		return nil, err
+	} else {
+		c = context.WithValue(ctx, txKey, tx)
+		return c, nil
+	}
+}
+
+// RollbackTx rolls back the transaction in the context.
+func (p *SQLProvider) RollbackTx(ctx context.Context) error {
+	tx, ok := ctx.Value(txKey).(*sqlx.Tx)
+	if !ok {
+		return fmt.Errorf("no transaction found in context")
+	}
+	return tx.Rollback()
+}
+
+// CommitTx commits the transaction in the context.
+func (p *SQLProvider) CommitTx(ctx context.Context) error {
+	tx, ok := ctx.Value(txKey).(*sqlx.Tx)
+	if !ok {
+		return fmt.Errorf("no transaction found in context")
+	}
+	return tx.Commit()
 }
 
 func (p *SQLProvider) GetSchemaVersion(ctx context.Context) (int, error) {
@@ -195,6 +226,7 @@ func (p *SQLProvider) ListEntries(ctx context.Context) ([]Entry, error) {
 }
 
 func (p *SQLProvider) CreateEntry(ctx context.Context, entry Entry) error {
+
 	createdAt := entry.CreatedAt
 	if createdAt.IsZero() {
 		createdAt = time.Now()
