@@ -36,6 +36,9 @@ var rootCmd = &cobra.Command{
 		// Set global config
 		config.Cfg = cfg
 
+		// Init logger
+		initLogger(cfg)
+
 		// Initialize storage provider
 		provider = storage.NewProvider(&cfg.Storage)
 		if provider == nil {

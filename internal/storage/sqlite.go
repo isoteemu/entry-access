@@ -6,6 +6,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
+// SQLiteProvider extends SQLProvider for SQLite-specific functionality.
 type SQLiteProvider struct {
 	SQLProvider
 }

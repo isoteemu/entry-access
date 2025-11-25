@@ -64,3 +64,8 @@ COPY --from=assets-builder /app/${DIST_DIR} ${DIST_DIR}
 COPY --from=assets-builder --chown=1000:1000 /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
 COPY --from=builder --chown=1000:1000 /go /go
 COPY --from=builder --chown=1000:1000 /app /app
+
+# Install SQLite for development
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y sqlite3

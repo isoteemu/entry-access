@@ -222,7 +222,5 @@ func RegisterRoutes(r *gin.Engine) *gin.Engine {
 	// Email login routes
 	routes.EmailLoginRoute(auth_rg)
 
-	// Debug routes
-	routes.RegisterDebugRoutes(r)
 	return r
 }
