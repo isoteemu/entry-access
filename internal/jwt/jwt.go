@@ -3,7 +3,7 @@ package jwt
 import (
 	"context"
 	. "entry-access-control/internal/config"
-	. "entry-access-control/internal/utils"
+	"entry-access-control/internal/nonce"
 	"errors"
 	"fmt"
 	"time"
@@ -42,7 +42,7 @@ func DecodeEntryJWT(tokenString string) (*EntryClaim, error) {
 	// Consume nonce to prevent replay attacks
 	// Note: This must be done after validating the token to avoid DoS attacks
 	// with random nonces.
-	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
+	if ok, err := nonce.Store.Consume(ctx, claims.ID); err != nil || !ok {
 		if err != nil {
 			return nil, err
 		}
@@ -95,8 +95,27 @@ func NewDeviceProvisionClaim(deviceId string, clientIP string) DeviceProvisionCl
 	}
 }
 
+// DecodeDeviceProvisionJWT decodes and validates a device provision JWT token
+// and consumes the nonce to prevent replay attacks.
+func DecodeDeviceProvisionJWT(tokenString string, options ...jwt.ParserOption) (*DeviceProvisionClaim, error) {
+	claims, err := decodeJWT(tokenString, &DeviceProvisionClaim{}, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+	// Consume nonce to prevent replay attacks
+	if ok, err := nonce.Store.Consume(ctx, claims.ID); err != nil || !ok {
+		if err != nil {
+			return nil, err
+		}
+		return nil, ErrInvalidNonce
+	}
+	return claims, nil
+}
+
 func mustCreateRegisteredClaim(ttl uint) jwt.RegisteredClaims {
-	nonce, err := Nonce(ttl + 10) // nonce TTL is slightly longer than token TTL to allow for clock skew
+	nonce, err := nonce.Nonce(ttl + 10) // nonce TTL is slightly longer than token TTL to allow for clock skew
 	if err != nil {
 		panic(fmt.Sprintf("failed to generate nonce: %v", err))
 	}
@@ -137,7 +156,7 @@ func DecodeAccessCodeJWT(tokenString string, options ...jwt.ParserOption) (*Acce
 
 func ConsumeClaimNonce(claims *jwt.RegisteredClaims) error {
 	ctx := context.Background()
-	if ok, err := NonceStore.Consume(ctx, claims.ID); err != nil || !ok {
+	if ok, err := nonce.Store.Consume(ctx, claims.ID); err != nil || !ok {
 		if err != nil {
 			return err
 		}

@@ -10,8 +10,8 @@ import (
 	. "entry-access-control/internal"
 	"entry-access-control/internal/access"
 	"entry-access-control/internal/config"
+	"entry-access-control/internal/nonce"
 	"entry-access-control/internal/storage"
-	. "entry-access-control/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	qrcode "github.com/skip2/go-qrcode"
@@ -128,7 +128,7 @@ func ServerMain(ctx context.Context, storageProvider storage.Provider) {
 	}
 	slog.Info("Storage provider initialized")
 
-	InitNonceStore(config.Cfg)
+	nonce.InitNonceStore(config.Cfg, storageProvider)
 
 	if config.Cfg.SupportURL != "" {
 		genSupportQr(config.Cfg.SupportURL)

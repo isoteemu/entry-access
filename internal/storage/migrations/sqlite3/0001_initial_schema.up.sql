@@ -16,3 +16,9 @@ CREATE TABLE IF NOT EXISTS entryways (
     deleted_at TIMESTAMP DEFAULT NULL,
     UNIQUE(name) WHERE deleted_at IS NULL
 );
+
+CREATE TABLE IF NOT EXISTS nonces (
+    nonce TEXT PRIMARY KEY,
+    expires_at TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nonces_expires_at ON nonces (expires_at);

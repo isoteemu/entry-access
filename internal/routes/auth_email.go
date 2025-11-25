@@ -21,11 +21,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/argon2"
 
-	access "entry-access-control/internal/access"
+	"entry-access-control/internal/access"
 	. "entry-access-control/internal/config"
 	"entry-access-control/internal/email"
 	"entry-access-control/internal/jwt"
-	. "entry-access-control/internal/utils"
+	"entry-access-control/internal/nonce"
+	"entry-access-control/internal/utils"
 
 	gojwt "github.com/golang-jwt/jwt/v5"
 )
@@ -81,8 +82,7 @@ type emailLoginLink struct {
 	IPLocation string  // Location of the user
 }
 
-var emailLoginVerifyStore NonceStoreInterface
-
+// Helper function to send login error responses
 func loginErr(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{"error": message})
 }
@@ -172,7 +172,7 @@ func SuccessUrl(c *gin.Context, entryId string, data ...map[string]interface{}) 
 		}
 	}
 
-	return UrlFor(c, fmt.Sprintf("/entry/%s%s", entryToken, params))
+	return utils.UrlFor(c, fmt.Sprintf("/entry/%s%s", entryToken, params))
 }
 
 // isSafeUrl checks if the target URL is within the same origin as the base URL
@@ -197,12 +197,6 @@ func isSafeUrl(c *gin.Context, targetUrl string) bool {
 }
 
 func EmailLoginRoute(r *gin.RouterGroup) {
-
-	emailLoginVerifyStore, err := NewStore(Cfg)
-	if err != nil {
-		slog.Error("Failed to create email login verify store", "error", err)
-		panic("Failed to create email login verify store")
-	}
 
 	r.GET("/login", func(c *gin.Context) {
 
@@ -311,7 +305,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			return
 		}
 
-		link := UrlFor(c, "/auth/email/verify/"+linkToken)
+		link := utils.UrlFor(c, "/auth/email/verify/"+linkToken)
 
 		slog.Debug("Generated email login link and OTP", "email", emailAddr, "link", link, "otp", otp, "expires", expires)
 
@@ -328,7 +322,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		}
 
 		// Render email template
-		emailMsg, err := RenderTemplate(c, "login_link.html.tmpl", data)
+		emailMsg, err := utils.RenderTemplate(c, "login_link.html.tmpl", data)
 		if err != nil {
 			slog.Error("Failed to render email login template", "error", err, "data", data)
 			loginErr(c, 500, "Internal server error: failed to render template")
@@ -419,7 +413,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			})
 			return
 		}
-		loginUrl := UrlFor(c, "/auth/email/verify/"+loginToken)
+		loginUrl := utils.UrlFor(c, "/auth/email/verify/"+loginToken)
 
 		// Start the event loop
 		ticker := time.NewTicker(1 * time.Second)
@@ -429,27 +423,25 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 			select {
 			case <-ticker.C:
 
-				// TODO: Uudelleenfaktorinti kesken
-
 				var data = gin.H{
 					"status": "pending",
 				}
 
 				// Check if the OTP claim ID has been marked as verified
-				confirmed, err := emailLoginVerifyStore.Consume(c.Request.Context(), claim.ID)
+				confirmed, err := nonce.Store.Consume(c.Request.Context(), claim.ID)
 				if confirmed && err == nil {
 					data["status"] = VERIFY_STATUS_CONFIRMED
 					data["redirect"] = loginUrl
 				} else if err != nil {
-					switch err {
-					case &NonceMissingError{}:
+					switch err.(type) {
+					case *nonce.NonceMissingError:
 						// Not verified yet, keep waiting
 						data["status"] = VERIFY_STATUS_PENDING
-					case &NonceExpiredError{}:
+					case *nonce.NonceExpiredError:
 						data["status"] = VERIFY_STATUS_EXPIRED
 						data["error"] = "Login link has expired. Please request a new login link."
 					default:
-						// Not found - assume not verified yet
+						slog.Warn("Unexpected error from nonce.Store.Consume", "error", err)
 						data["status"] = VERIFY_STATUS_PENDING
 					}
 				} else {
@@ -529,7 +521,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		c.JSON(200, gin.H{
 			"status":   "success",
 			"message":  "OTP verification successful",
-			"redirect": UrlFor(c, "/entry/"+entry_url),
+			"redirect": utils.UrlFor(c, "/entry/"+entry_url),
 		})
 	})
 
@@ -538,7 +530,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		token := c.Param("token")
 		if token == "" {
 			slog.Warn("Email verification token is missing", "token", token, "ip", c.ClientIP())
-			c.Redirect(302, UrlFor(c, "/auth/email/login?error=EMAIL_TOKEN_MISSING"))
+			c.Redirect(302, utils.UrlFor(c, "/auth/email/login?error=EMAIL_TOKEN_MISSING"))
 			return
 		}
 
@@ -547,11 +539,11 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		if err != nil {
 			if err == jwt.ErrInvalidNonce {
 				slog.Info("Email verification token has been used", "error", err, "ip", c.ClientIP())
-				c.Redirect(302, UrlFor(c, "/auth/email/login?error=VERIFY_TOKEN_USED"))
+				c.Redirect(302, utils.UrlFor(c, "/auth/email/login?error=VERIFY_TOKEN_USED"))
 				return
 			} else {
 				slog.Warn("Failed to decode email verification token", "error", err, "ip", c.ClientIP())
-				c.Redirect(302, UrlFor(c, "/auth/email/login?error=VERIFY_TOKEN_EXPIRED"))
+				c.Redirect(302, utils.UrlFor(c, "/auth/email/login?error=VERIFY_TOKEN_EXPIRED"))
 			}
 			return
 		}
@@ -568,9 +560,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		} else {
 			// Store the ID of the clicked link to allow polling to detect it
 			ttl := time.Duration(emailClaim.ExpiresAt.Unix()-time.Now().UTC().Unix()) * time.Second
-			emailLoginVerifyStore.Put(c.Request.Context(), emailClaim.ID, ttl)
-
-			//
+			nonce.Store.Put(c.Request.Context(), emailClaim.ID, ttl)
 		}
 
 		// TODO: Check the entry attempted to access
@@ -581,7 +571,7 @@ func EmailLoginRoute(r *gin.RouterGroup) {
 		c.JSON(200, gin.H{
 			"status":   "success",
 			"message":  "Email link verification successful. You can close this tab and return to the previous window.",
-			"redirect": UrlFor(c, "/entry/success"),
+			"redirect": utils.UrlFor(c, "/entry/success"),
 		})
 	})
 

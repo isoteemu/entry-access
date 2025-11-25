@@ -4,6 +4,7 @@ import (
 	"context"
 	"entry-access-control/internal/config"
 	"log/slog"
+	"time"
 )
 
 type Provider interface {
@@ -14,6 +15,12 @@ type Provider interface {
 	ListEntries(ctx context.Context) ([]Entry, error)
 	CreateEntry(ctx context.Context, entry Entry) error
 	DeleteEntry(ctx context.Context, entry Entry) error
+
+	// Nonce-related methods
+	CreateNonce(ctx context.Context, nonce string, expiresAt time.Time) error
+	ExistsNonce(ctx context.Context, nonce string) (bool, error)
+	ConsumeNonce(ctx context.Context, nonce string) (bool, error)
+	ExpireNonces(ctx context.Context, now time.Time) error
 }
 
 func NewProvider(config *config.Storage) Provider {

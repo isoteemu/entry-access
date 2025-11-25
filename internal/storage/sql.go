@@ -27,6 +27,12 @@ type Queries struct {
 	ListEntries SQL
 	CreateEntry SQL
 	DeleteEntry SQL
+
+	// --- Nonce-related queries ---
+	CreateNonce  SQL
+	ExistsNonce  SQL
+	ConsumeNonce SQL
+	ExpireNonces SQL
 }
 
 type SQLProvider struct {
@@ -48,6 +54,12 @@ func defaultQueries() Queries {
 		ListEntries: "SELECT id, name, created_at FROM entryways WHERE deleted_at IS NULL ORDER BY created_at DESC",
 		CreateEntry: "INSERT INTO entryways (name, created_at) VALUES (?, ?)",
 		DeleteEntry: "UPDATE entryways SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+
+		// --- Nonce-related queries ---
+		CreateNonce:  "INSERT INTO nonces (nonce, expires_at) VALUES (?, ?)",
+		ExistsNonce:  "SELECT COUNT(1) FROM nonces WHERE nonce = ? AND expires_at > ?",
+		ConsumeNonce: "DELETE FROM nonces WHERE nonce = ?",
+		ExpireNonces: "DELETE FROM nonces WHERE expires_at <= ?",
 	}
 }
 
@@ -226,7 +238,6 @@ func (p *SQLProvider) ListEntries(ctx context.Context) ([]Entry, error) {
 }
 
 func (p *SQLProvider) CreateEntry(ctx context.Context, entry Entry) error {
-
 	createdAt := entry.CreatedAt
 	if createdAt.IsZero() {
 		createdAt = time.Now()
@@ -265,5 +276,47 @@ func (p *SQLProvider) DeleteEntry(ctx context.Context, entry Entry) error {
 
 	p.logger.Debug("Entry deleted", "id", entry.ID, "name", entry.Name)
 
+	return nil
+}
+
+// --- Nonce-related methods ---
+func (p *SQLProvider) CreateNonce(ctx context.Context, nonce string, expiresAt time.Time) error {
+
+	_, err := p.db.ExecContext(ctx, p.Queries.CreateNonce, nonce, expiresAt.UTC().Unix())
+	if err != nil {
+		return fmt.Errorf("failed to create nonce: %w", err)
+	}
+	return nil
+}
+
+func (p *SQLProvider) ExistsNonce(ctx context.Context, nonce string) (bool, error) {
+	var count int
+	now := time.Now().UTC().Unix()
+	err := p.db.GetContext(ctx, &count, p.Queries.ExistsNonce, nonce, now)
+	if err != nil {
+		return false, fmt.Errorf("failed to check nonce existence: %w", err)
+	}
+	return count > 0, nil
+}
+
+func (p *SQLProvider) ConsumeNonce(ctx context.Context, nonce string) (bool, error) {
+	result, err := p.db.ExecContext(ctx, p.Queries.ConsumeNonce, nonce)
+	if err != nil {
+		return false, fmt.Errorf("failed to consume nonce: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected > 0, nil
+}
+
+func (p *SQLProvider) ExpireNonces(ctx context.Context, now time.Time) error {
+	_, err := p.db.ExecContext(ctx, p.Queries.ExpireNonces, now.UTC().Unix())
+	if err != nil {
+		return fmt.Errorf("failed to expire nonces: %w", err)
+	}
 	return nil
 }

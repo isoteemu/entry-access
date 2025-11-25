@@ -7,7 +7,7 @@ package routes
 import (
 	. "entry-access-control/internal/config"
 	. "entry-access-control/internal/jwt"
-	. "entry-access-control/internal/utils"
+	"entry-access-control/internal/nonce"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -99,7 +99,7 @@ func renewAuth(c *gin.Context, userId string, forceRenew bool) error {
 		// Decode old token to get its ID
 		oldClaims, err := DecodeAuthJWT(oldToken)
 		if err == nil {
-			nonce := oldClaims.ID
+			nonceValue := oldClaims.ID
 			expiration := oldClaims.ExpiresAt.Time
 
 			// Log odd behavior, where the user ID in the token does not match the expected user ID
@@ -120,7 +120,7 @@ func renewAuth(c *gin.Context, userId string, forceRenew bool) error {
 				slog.Debug("Renewing auth token for user", "userID", userId)
 
 				// Invalidate old token by consuming its nonce
-				NonceStore.Consume(c.Request.Context(), nonce)
+				nonce.Store.Consume(c.Request.Context(), nonceValue)
 
 				forceRenew = true
 			}
@@ -151,7 +151,7 @@ func AuthLogout(c *gin.Context) {
 	} else {
 		claims, err := DecodeAuthJWT(token)
 		if err == nil {
-			NonceStore.Consume(c.Request.Context(), claims.ID)
+			nonce.Store.Consume(c.Request.Context(), claims.ID)
 		}
 	}
 
