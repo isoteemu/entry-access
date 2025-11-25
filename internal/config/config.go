@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 
 	"entry-access-control/internal/email"
@@ -73,6 +74,18 @@ func getConfigPath() string {
 // LoadConfig reads configuration from environment variables and returns a Config struct.
 func LoadConfig(configFile ...string) (*Config, error) {
 	var cfg Config
+
+	// Load .env file if it exists (silently ignore if not found)
+	envPaths := []string{
+		".env",
+		filepath.Join(getConfigPath(), ".env"),
+	}
+	for _, envPath := range envPaths {
+		if err := godotenv.Load(envPath); err == nil {
+			slog.Debug("Loaded .env file", "path", envPath)
+			break // Only load first found .env file
+		}
+	}
 
 	v := viper.New()
 	v.SetConfigName("config")
