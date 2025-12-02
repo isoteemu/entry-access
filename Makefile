@@ -17,7 +17,6 @@ $(DIST_DIR)/assets/sas-emoji.json: $(DIST_DIR)
 	@echo "Downloading sas-emoji spec"
 	$(DOWNLOAD_CMD) $(DIST_DIR)/assets/sas-emoji.json https://raw.githubusercontent.com/matrix-org/matrix-spec/main/data-definitions/sas-emoji.json
 
-
 # Download fonts
 $(DIST_DIR)/assets/fonts: $(DIST_DIR)
 	@echo "Downloading fonts"
@@ -34,6 +33,12 @@ $(DIST_DIR)/assets/css/output.css: web/assets/css/input.css $(DIST_DIR)
 	mkdir -p $(DIST_DIR)/assets/css
 	tailwindcss -i ./web/assets/css/input.css -o $(DIST_DIR)/assets/css/output.css
 
+# NoSleep JS
+$(DIST_DIR)/vendor/js/nosleep.min.js: $(DIST_DIR)
+	@echo "Downloading NoSleep.js"
+	mkdir -p $(DIST_DIR)/vendor/js
+	$(DOWNLOAD_CMD) $(DIST_DIR)/vendor/js/nosleep.min.js https://raw.githubusercontent.com/richtr/NoSleep.js/refs/tags/v0.12.0/dist/NoSleep.min.js
+
 # Target to download emoji data
 download-emoji-spec: $(DIST_DIR)/assets/sas-emoji.json
 
@@ -43,7 +48,10 @@ download-fonts: $(DIST_DIR)/assets/fonts
 # Target to compile CSS
 compile-css: $(DIST_DIR)/assets/css/output.css
 
-# Target to download all assets
-assets: download-emoji-spec download-fonts compile-css
+# Vendor JS target
+vendor-js: $(DIST_DIR)/vendor/js/nosleep.min.js
 
-.PHONY: download-emoji-spec download-fonts compile-css assets
+# Target to download all assets
+assets: download-emoji-spec download-fonts compile-css vendor-js
+
+.PHONY: download-emoji-spec download-fonts compile-css assets vendor-js

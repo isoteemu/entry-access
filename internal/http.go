@@ -129,7 +129,7 @@ func createRenderer(templateDir string) multitemplate.Renderer {
 		copy(layoutCopy, layouts)
 		files := append(layoutCopy, include)
 		slog.Debug("Loading template", "template", include, "with_layouts", layoutCopy)
-		r.AddFromFiles(filepath.Base(include), files...)
+		r.AddFromFilesFuncsWithOptions(filepath.Base(include), routes.TemplateFuncs(), multitemplate.TemplateOptions{}, files...)
 	}
 	return r
 }
@@ -139,6 +139,7 @@ func HTTPServer() *gin.Engine {
 
 	r.Static("/assets/", "./web/assets/")
 	r.Static("/dist/assets", "./dist/assets") // Serve compiled CSS and fonts
+	r.Static("/dist/vendor", "./dist/vendor") // Serve vendor JS
 
 	if Cfg.AllowedNetworks != "" {
 		slog.Debug("Enabling IP access control", "allowed_networks", Cfg.AllowedNetworks)

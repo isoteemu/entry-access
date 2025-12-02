@@ -125,6 +125,8 @@
 {{end}}
 
 {{define "scripts"}}
+    {{ script_tag "/dist/vendor/js/nosleep.min.js" }}
+    {{ script_tag "/assets/js/device.js" }}
     <!-- JavaScript for device provisioning -->
     <script type="module">
         import {DeviceProvisioning, loadConfig} from '/assets/js/app.js';
