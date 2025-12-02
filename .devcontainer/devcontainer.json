@@ -28,7 +28,8 @@
 				"esbenp.prettier-vscode",
 				"ms-azuretools.vscode-docker",
 				"bradlc.vscode-tailwindcss",
-				"qwtel.sqlite-viewer"
+				"qwtel.sqlite-viewer",
+				"ms-vscode.makefile-tools"
 			]
 		}
 	},
