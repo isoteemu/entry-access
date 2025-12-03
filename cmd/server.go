@@ -124,7 +124,6 @@ func ServerMain(ctx context.Context, storageProvider storage.Provider) {
 		slog.Error("Storage provider is nil")
 		os.Exit(1)
 	}
-	slog.Info("Storage provider initialized")
 
 	nonce.InitNonceStore(config.Cfg, storageProvider)
 
