@@ -5,6 +5,7 @@ package routes
 import (
 	"crypto/sha512"
 	"encoding/base64"
+	"entry-access-control/internal/utils"
 	"fmt"
 	"html"
 	"html/template"
@@ -13,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/gin-gonic/gin"
 )
 
 // sriCache caches computed SRI integrity strings keyed by the src path.
@@ -57,18 +60,22 @@ func computeLocalSRI(src string) (string, error) {
 // It accepts the script src and automatically calculates and caches the
 // SRI integrity hash for local assets under /assets/ or /dist/.
 // When an integrity is available it adds crossorigin="anonymous".
+// Integrity values are only included when Gin is in release mode.
 func ScriptTag(src string) template.HTML {
 	// Escape attribute values to avoid injection, then build the tag.
 	escSrc := html.EscapeString(src)
 
 	var integrity string
-	if v, ok := sriCache.Load(src); ok {
-		integrity = v.(string)
-	} else {
-		sri, err := computeLocalSRI(src)
-		if err == nil && sri != "" {
-			sriCache.Store(src, sri)
-			integrity = sri
+	// Only compute integrity when in production/release mode
+	if gin.Mode() == gin.ReleaseMode {
+		if v, ok := sriCache.Load(src); ok {
+			integrity = v.(string)
+		} else {
+			sri, err := computeLocalSRI(src)
+			if err == nil && sri != "" {
+				sriCache.Store(src, sri)
+				integrity = sri
+			}
 		}
 	}
 
@@ -83,9 +90,14 @@ func ScriptTag(src string) template.HTML {
 	return template.HTML(tag)
 }
 
+func version() string {
+	return utils.GetVersion()
+}
+
 // TemplateFuncs returns a FuncMap with template helpers for routes templates.
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"script_tag": ScriptTag,
+		"version":    version,
 	}
 }
