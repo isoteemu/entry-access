@@ -80,9 +80,7 @@ class QRCodeElement extends HTMLElement {
         
         // Refresh at 50% of the lifetime
         const refreshDelay = Math.max(timeUntilExpiry / 2, 1000); // Minimum 1 second
-        
-        console.log(`QR Code: Scheduling refresh in ${Math.round(refreshDelay / 1000)}s (expires at ${new Date(expiryTime).toISOString()})`);
-        
+
         this._refreshTimer = setTimeout(() => {
             this.loadAndGenerateQR();
         }, refreshDelay);
