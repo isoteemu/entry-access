@@ -1,5 +1,6 @@
 # Configurable directory for build artifacts
 DIST_DIR ?= dist
+VENDOR_JS_DIR := $(DIST_DIR)/vendor/js
 
 # Font download URL base
 FONT_BASE_URL ?= https://www.jyu.fi/themes/custom/jyu/fonts
@@ -11,6 +12,9 @@ DOWNLOAD_CMD := $(shell command -v curl >/dev/null 2>&1 && echo "curl -o" || ech
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 	mkdir -p $(DIST_DIR)/assets
+
+$(VENDOR_JS_DIR): $(DIST_DIR)
+	mkdir -p $(DIST_DIR)/vendor/js
 
 # Download sas-emoji.json from matrix-spec repository
 $(DIST_DIR)/assets/sas-emoji.json: $(DIST_DIR)
@@ -34,10 +38,14 @@ $(DIST_DIR)/assets/css/output.css: web/assets/css/input.css $(DIST_DIR)
 	tailwindcss -i ./web/assets/css/input.css -o $(DIST_DIR)/assets/css/output.css
 
 # NoSleep JS
-$(DIST_DIR)/vendor/js/nosleep.min.js: $(DIST_DIR)
+$(VENDOR_JS_DIR)/nosleep.min.js: $(VENDOR_JS_DIR)
 	@echo "Downloading NoSleep.js"
-	mkdir -p $(DIST_DIR)/vendor/js
-	$(DOWNLOAD_CMD) $(DIST_DIR)/vendor/js/nosleep.min.js https://raw.githubusercontent.com/richtr/NoSleep.js/refs/tags/v0.12.0/dist/NoSleep.min.js
+	$(DOWNLOAD_CMD) $(VENDOR_JS_DIR)/nosleep.min.js https://raw.githubusercontent.com/richtr/NoSleep.js/refs/tags/v0.12.0/dist/NoSleep.min.js
+
+# QR Code JS
+$(VENDOR_JS_DIR)/qrcode.min.js: $(VENDOR_JS_DIR)
+	@echo "Downloading QRCode.js"
+	$(DOWNLOAD_CMD) $(VENDOR_JS_DIR)/qrcode.min.js https://raw.githubusercontent.com/papnkukn/qrcode-svg/refs/tags/v1.1.0/dist/qrcode.min.js
 
 # Target to download emoji data
 download-emoji-spec: $(DIST_DIR)/assets/sas-emoji.json
@@ -49,7 +57,7 @@ download-fonts: $(DIST_DIR)/assets/fonts
 compile-css: $(DIST_DIR)/assets/css/output.css
 
 # Vendor JS target
-vendor-js: $(DIST_DIR)/vendor/js/nosleep.min.js
+vendor-js: $(VENDOR_JS_DIR)/nosleep.min.js $(VENDOR_JS_DIR)/qrcode.min.js
 
 # Target to download all assets
 assets: download-emoji-spec download-fonts compile-css vendor-js
