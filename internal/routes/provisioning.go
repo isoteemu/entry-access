@@ -38,15 +38,9 @@ func ProvisioningApi(r *gin.RouterGroup) {
 		c.HTML(http.StatusOK, "provisioning.html.tmpl", gin.H{"QRCodeURL": qr_url})
 	})
 
-	r.GET("/test", func(ctx *gin.Context) {
-		url := r.BasePath() + "/device"
-		slog.Info("Provisioning test page accessed", "url", url)
-		errorPage(ctx, http.StatusInternalServerError, "This is a test error page: ")
-	})
-
 	// QR code generation route
 	// Expects device_id as query parameter
-	// Example: /api/provision/qr?device_id=DEVICE123
+	// Example: /api/provision/qr.json?device_id=DEVICE123
 	r.GET("qr.json", func(c *gin.Context) {
 		// Generate provisioning QR image
 
@@ -78,10 +72,8 @@ func ProvisioningApi(r *gin.RouterGroup) {
 
 		c.JSON(http.StatusOK, gin.H{
 			"url":        provisioningURL,
-			"token":      token,
 			"expires_at": time.Now().Add(time.Duration(Cfg.TokenTTL) * time.Second).Format(time.RFC3339),
 		})
-
 	})
 
 }
