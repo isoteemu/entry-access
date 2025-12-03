@@ -16,7 +16,6 @@ import (
 	. "entry-access-control/internal/utils"
 
 	"github.com/gin-gonic/gin"
-	"github.com/skip2/go-qrcode"
 )
 
 func genEntryToken(entryID string) (string, error) {
@@ -96,45 +95,41 @@ func userExists(c *gin.Context, userID string) (bool, error) {
 
 func EntryRoute(r *gin.RouterGroup) {
 
-	r.GET("/qr", func(c *gin.Context) {
+	// JSON endpoint for QR data (client-side generation)
+	r.GET("/qr.json", func(c *gin.Context) {
+		// Check for cache buster
+		if c.Query("cb") == "" {
+			slog.Debug("Cache buster not set, redirecting")
+			c.Redirect(http.StatusFound, r.BasePath()+"/qr.json?cb="+strconv.FormatInt(time.Now().UTC().Unix(), 16))
+			return
+		}
+
 		if err, _ := checkProvisioning(c); err != nil {
 			log.Printf("Provisioning check failed: %v", err)
 			c.JSON(http.StatusForbidden, gin.H{"error": "Provisioning check failed"})
 			return
 		}
 
-		// Redirect if cache buster is not set - just to be sure
-		if c.Query("cb") == "" {
-			slog.Debug("Cache buster not set, redirecting")
-			c.Redirect(http.StatusFound, "/qr?cb="+strconv.FormatInt(time.Now().UTC().Unix(), 16))
-			return
-		}
-
 		// TODO: Extract from device provisioning data
 		token, err := getEntryToken("entry1")
-
 		if err != nil {
 			slog.Debug("Error getting entry token", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting entry token"})
 			return
 		}
 
-		slog.Debug("Entry token", "token", token)
-		// Generate URL
-
 		// Generate URL pointing to self
-		url := UrlFor(c, "/entry/"+token)
+		url := UrlFor(c, r.BasePath()+"/entry/"+token)
 
-		// We could cache qr code, but it takes milliseconds to generate
-		qr, err := qrcode.Encode(url, qrcode.Medium, QR_IMAGE_SIZE)
-		if err != nil {
-			slog.Debug("Error generating QR code", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating QR code"})
-			return
-		}
-		slog.Debug("Generated QR code", "url", url)
+		// Calculate expiration time
+		expiresAt := time.Now().Add(time.Duration(Cfg.TokenTTL) * time.Second)
 
-		c.Data(http.StatusOK, "image/png", qr)
+		slog.Debug("Generated QR data", "url", url, "expires_at", expiresAt)
+
+		c.JSON(http.StatusOK, gin.H{
+			"url":        url,
+			"expires_at": expiresAt.Format(time.RFC3339),
+		})
 	})
 
 	// TODO: Integrate token check, just to show sensible message.

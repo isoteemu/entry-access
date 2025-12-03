@@ -13,7 +13,6 @@ import (
 	. "entry-access-control/internal/jwt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/skip2/go-qrcode"
 )
 
 func genProvisioningJWT(deviceID string, clientIP string) (string, error) {
@@ -48,7 +47,7 @@ func ProvisioningApi(r *gin.RouterGroup) {
 	// QR code generation route
 	// Expects device_id as query parameter
 	// Example: /api/provision/qr?device_id=DEVICE123
-	r.GET("qr", func(c *gin.Context) {
+	r.GET("qr.json", func(c *gin.Context) {
 		// Generate provisioning QR image
 
 		// For provisioning url, we need device id and client IP
@@ -74,16 +73,15 @@ func ProvisioningApi(r *gin.RouterGroup) {
 
 		provisioningURL := UrlFor(c, r.BasePath()+"/authorize?"+token)
 
-		qrCode, err := qrcode.Encode(provisioningURL, qrcode.Medium, QR_IMAGE_SIZE)
-		if err != nil {
-			slog.Warn("Failed to generate QR code", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate QR code"})
-			return
-		}
-
 		// Send cache expiration based on token TTL
 		c.Header("Cache-Control", fmt.Sprintf("max-age=%d", Cfg.TokenTTL))
-		c.Data(http.StatusOK, "image/png", qrCode)
+
+		c.JSON(http.StatusOK, gin.H{
+			"url":        provisioningURL,
+			"token":      token,
+			"expires_at": time.Now().Add(time.Duration(Cfg.TokenTTL) * time.Second).Format(time.RFC3339),
+		})
+
 	})
 
 }

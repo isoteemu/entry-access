@@ -13,9 +13,15 @@
             </h2>
             
             <!-- QR Code Image - Scalable -->
-            <div class="w-full max-w-xs sm:max-w-sm lg:max-w-md xl:max-w-lg flex justify-center">
-                <div class="w-full aspect-square bg-gray-100 flex items-center justify-center">
-                    <img src="{{.QRCodeURL}}" alt="QR Code" class="w-full h-auto">
+            <div class="w-full max-w-xs sm:max-w-sm lg:max-w-md xl:max-w-lg flex flex-col items-center justify-center">
+                <div class="w-full aspect-square bg-gray-100 flex items-center justify-center rounded-lg">
+                    <qr-code 
+                        src="entry/qr.json" 
+                        width="512" 
+                        height="512"
+                        show-link="true"
+                        class="w-full h-auto">
+                    </qr-code>
                 </div>
             </div>
         </div>
@@ -115,5 +121,22 @@
     </div>
 {{end}}
 
+{{define "scripts"}}
+{{ script_tag "/dist/vendor/js/qrcode.min.js" }}
+<script type="module">
+    import QRCodeElement from '/assets/js/qr.js';
+    
+    const qrElement = document.querySelector('qr-code');
+    
+    // Event listeners
+    qrElement?.addEventListener('qr-loaded', (e) => {
+        console.log('QR Code loaded:', e.detail.expiresAt ? `expires at ${e.detail.expiresAt}` : 'no expiration');
+    });
+    
+    qrElement?.addEventListener('qr-error', (e) => {
+        console.error('QR Code error:', e.detail.error);
+    });
+</script>
+{{end}}
 
 {{template "base" .}}

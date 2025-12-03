@@ -25,7 +25,13 @@
             
             <!-- QR Code Image - Scalable -->
             <div class="w-full max-w-xs sm:max-w-sm lg:max-w-md xl:max-w-lg flex justify-center">
-                <img alt="Provisioning QR Code" class="w-full h-auto" id="qr-code-image">
+                <qr-code 
+                    src="qr.json"
+                    width="512" 
+                    height="512"
+                    class="w-full h-auto"
+                    device-id="true">
+                </qr-code>
             </div>
 
             <!-- Status Indicator -->
@@ -125,6 +131,19 @@
 {{end}}
 
 {{define "scripts"}}
+    {{ script_tag "/dist/vendor/js/qrcode.min.js" }}
+    <script type="module">
+
+        import QRCodeElement from '/assets/js/qr.js';
+        
+        const qrElement = document.querySelector('qr-code');
+
+        qrElement?.addEventListener('qr-error', (e) => {
+            console.error('QR Code error:', e.detail.error);
+            window.ErrorHandler.addError("QR_CODE_ERROR", e.detail.error);
+        });
+    </script>
+
     {{ script_tag "/dist/vendor/js/nosleep.min.js" }}
     {{ script_tag "/assets/js/device.js" }}
     <!-- JavaScript for device provisioning -->
@@ -159,18 +178,6 @@
 
         // Poll for authorization status
         let pollInterval;
-
-        function refreshQRCode() {
-            const urlParams = new URLSearchParams();
-            urlParams.append('device_id', deviceId);
-            urlParams.append('cb', Date.now());
-
-            const separator = qrImageUrl.includes('?') ? '&' : '?';
-            let imageSrc = qrImageUrl + separator + urlParams.toString();
-
-            qrImage.src = imageSrc;
-            console.log('QR code refreshed with URL:', imageSrc);
-        }
 
         function pollAuthorizationStatus() {
             // Check if device has been authorized
@@ -209,13 +216,7 @@
 
         // Start polling every 2 seconds
         pollInterval = setInterval(pollAuthorizationStatus, 2000);
-
-        // Initial status check
         pollAuthorizationStatus();
-
-        // Start QR image refresh
-        setInterval(refreshQRCode, config.TokenTTL * 1000);
-        refreshQRCode();
 
     </script>
 {{end}}
