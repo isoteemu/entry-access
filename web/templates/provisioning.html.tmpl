@@ -144,8 +144,7 @@
             window.ErrorHandler.addError("QR_CODE_ERROR", e.detail.error);
         });
     </script>
-
-    {{ script_tag "/dist/vendor/js/nosleep.min.js" }}
+}
     {{ script_tag "/assets/js/device.js" }}
     <!-- JavaScript for device provisioning -->
     <script type="module">
@@ -157,9 +156,6 @@
         // Initialize device provisioning
         const provisioning = new DeviceProvisioning();
         const deviceId = provisioning.initialize();
-
-        // Build QR code URL with device ID and client ID
-        let qrImageUrl = '{{.QRCodeURL}}';
 
         // Display device ID
         document.getElementById('device-id').textContent = deviceId;
