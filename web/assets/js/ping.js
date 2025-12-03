@@ -32,7 +32,6 @@ class PingMonitor {
         const timeoutId = setTimeout(() => controller.abort(), 1000);
 
         try {
-            console.log(`Pinging ${url}`);
             const response = await fetch(url, {
                 method: 'GET',
                 signal: controller.signal,
@@ -44,7 +43,6 @@ class PingMonitor {
             clearTimeout(timeoutId);
             
             if (response.ok) {
-                console.log('Ping successful');
                 this.handleSuccess();
             } else {
                 console.error('Ping failed:', response.status);
