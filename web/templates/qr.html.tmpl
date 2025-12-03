@@ -122,6 +122,8 @@
 {{end}}
 
 {{define "scripts"}}
+
+{{ script_tag "/dist/vendor/js/nosleep.min.js" }}
 {{ script_tag "/dist/vendor/js/qrcode.min.js" }}
 <script type="module">
     import QRCodeElement from '/assets/js/qr.js';
