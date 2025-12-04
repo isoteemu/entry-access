@@ -21,6 +21,19 @@ type Provider interface {
 	ExistsNonce(ctx context.Context, nonce string) (bool, error)
 	ConsumeNonce(ctx context.Context, nonce string) (bool, error)
 	ExpireNonces(ctx context.Context, now time.Time) error
+
+	// Device provisioning methods
+	CreateDevice(ctx context.Context, device Device) error
+	GetDevice(ctx context.Context, deviceID string) (*Device, error)
+	ListDevices(ctx context.Context, status DeviceStatus) ([]Device, error)
+	UpdateDeviceStatus(ctx context.Context, deviceID string, status DeviceStatus, approvedBy *string) error
+
+	// Approved device methods
+	CreateApprovedDevice(ctx context.Context, device ApprovedDevice) error
+	GetApprovedDevice(ctx context.Context, deviceID string, entryID int64) (*ApprovedDevice, error)
+	ListApprovedDevicesByDevice(ctx context.Context, deviceID string) ([]ApprovedDevice, error)
+	ListApprovedDevicesByEntry(ctx context.Context, entryID int64) ([]ApprovedDevice, error)
+	RevokeApprovedDevice(ctx context.Context, deviceID string, entryID int64) error
 }
 
 func NewProvider(config *config.Storage) Provider {
