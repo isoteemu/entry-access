@@ -28,11 +28,11 @@ func checkProvisioning(c *gin.Context) (error, bool) {
 func ProvisioningApi(r *gin.RouterGroup) {
 
 	// Device provisioning route
-	r.GET("/device", func(c *gin.Context) {
+	r.GET("/", func(c *gin.Context) {
 		// Cache buster
 		cacheBuster := strconv.FormatInt(time.Now().UTC().Unix(), 16)
 
-		qr_url := UrlFor(c, r.BasePath()+"/qr?cb="+cacheBuster)
+		qr_url := UrlFor(c, r.BasePath()+"/qr.json?cb="+cacheBuster)
 
 		// Render page
 		c.HTML(http.StatusOK, "provisioning.html.tmpl", gin.H{"QRCodeURL": qr_url})
