@@ -46,6 +46,9 @@ type Queries struct {
 	ListApprovedDevicesByDevice SQL
 	ListApprovedDevicesByEntry  SQL
 	RevokeApprovedDevice        SQL
+
+	// --- Device maintenance queries ---
+	PruneDevices SQL
 }
 
 type SQLProvider struct {
@@ -86,6 +89,9 @@ func defaultQueries() Queries {
 		ListApprovedDevicesByDevice: "SELECT id, device_id, entry_id, approved_by, approved_at, revoked_at FROM approved_devices WHERE device_id = ? AND revoked_at IS NULL ORDER BY approved_at DESC",
 		ListApprovedDevicesByEntry:  "SELECT id, device_id, entry_id, approved_by, approved_at, revoked_at FROM approved_devices WHERE entry_id = ? AND revoked_at IS NULL ORDER BY approved_at DESC",
 		RevokeApprovedDevice:        "UPDATE approved_devices SET revoked_at = ? WHERE device_id = ? AND entry_id = ? AND revoked_at IS NULL",
+
+		// --- Device maintenance queries ---
+		PruneDevices: "DELETE FROM devices WHERE created_at < ? AND status = ?",
 	}
 }
 
@@ -491,4 +497,21 @@ func (p *SQLProvider) RevokeApprovedDevice(ctx context.Context, deviceID string,
 	p.logger.Debug("Approved device revoked", "device_id", deviceID, "entry_id", entryID)
 
 	return nil
+}
+
+// --- Device maintenance methods ---
+func (p *SQLProvider) PruneDevices(ctx context.Context, olderThan time.Time, statusFilter DeviceStatus) (int64, error) {
+	result, err := p.db.ExecContext(ctx, p.Queries.PruneDevices, olderThan, statusFilter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to prune devices: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	p.logger.Info("Devices pruned", "count", rowsAffected, "older_than", olderThan, "status", statusFilter)
+
+	return rowsAffected, nil
 }

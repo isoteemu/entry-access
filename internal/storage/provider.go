@@ -34,6 +34,9 @@ type Provider interface {
 	ListApprovedDevicesByDevice(ctx context.Context, deviceID string) ([]ApprovedDevice, error)
 	ListApprovedDevicesByEntry(ctx context.Context, entryID int64) ([]ApprovedDevice, error)
 	RevokeApprovedDevice(ctx context.Context, deviceID string, entryID int64) error
+
+	// Device maintenance methods
+	PruneDevices(ctx context.Context, olderThan time.Time, statusFilter DeviceStatus) (int64, error)
 }
 
 func NewProvider(config *config.Storage) Provider {
