@@ -1,9 +1,11 @@
 {{define "title"}}QR Code Display{{end}}
 
+
+
 {{define "content"}}
-<div class="flex flex-col lg:flex-row lg:divide-x lg:divide-gray-200">
+<div class="flex flex-col lg:flex-row lg:divide-x lg:divide-gray-200 h-full">
     <!-- Left Section: QR Code and Helpful Text -->
-    <div class="w-full lg:w-1/2 lg:pr-8 pb-8 lg:pb-0">
+    <div class="w-full lg:w-1/2 lg:pr-8 pb-8 lg:pb-0 flex flex-col">
         
         <!-- QR Code Section -->
         <div class="flex flex-col items-center space-y-6 mb-8">
@@ -19,7 +21,7 @@
                         src="entry/qr.json" 
                         width="512" 
                         height="512"
-                        show-link="true"
+                        show-link="false"
                         class="w-full h-auto">
                     </qr-code>
                 </div>
@@ -56,10 +58,10 @@
     </div>
     
     <!-- Right Section: Lorem Ipsum Content -->
-    <div class="w-full lg:w-1/2 lg:pl-8 pt-8 lg:pt-0">
+    <div class="w-full lg:w-1/2 lg:pl-8 pt-8 lg:pt-0 flex flex-col">
         <h3 class="text-2xl font-light mb-6">Additional Information</h3>
 
-        <div class="space-y-4 leading-relaxed">
+        <div class="space-y-4 leading-relaxed flex-grow flex flex-col h-full">
             <p>
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor 
                 incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis 
@@ -98,16 +100,15 @@
             <!-- Separator -->
             <div class="border-t border-gray-200 my-6"></div>
             
-            <p>
-                Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium 
-                doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore 
-                veritatis et quasi architecto beatae vitae dicta sunt explicabo.
-            </p>
-            
-            <p>
-                Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, 
-                sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
-            </p>
+            <!-- Calendar view -->
+            <iframe 
+                id="calendar-iframe"
+                src="https://kovs-calendar.app.jyu.fi/room/Ag%20C331.3" 
+                class="w-full grow rounded-lg shadow-sm min-h-96 h-full"
+                loading="lazy"
+                title="Calendar View">
+            </iframe>
+
         </div>
     </div>
 </div>
@@ -129,15 +130,28 @@
     import QRCodeElement from '/assets/js/qr.js';
     
     const qrElement = document.querySelector('qr-code');
-    
-    // Event listeners
-    qrElement?.addEventListener('qr-loaded', (e) => {
-        console.log('QR Code loaded:', e.detail.expiresAt ? `expires at ${e.detail.expiresAt}` : 'no expiration');
-    });
-    
+
     qrElement?.addEventListener('qr-error', (e) => {
-        console.error('QR Code error:', e.detail.error);
+        window.Error
     });
+
+    (() => {
+        // Calendar view reload logic
+        const calendarIframe = document.querySelector('iframe#calendar-iframe');
+        if (calendarIframe) {
+            // If has a calendar URL, set up periodic reload
+            if (! calendarIframe.src || calendarIframe.src == '') {
+                console.log('No calendar URL set, skipping reload setup.');
+                return;
+            }
+            setInterval(() => {
+                cburl = new URL(calendarIframe.src);
+                cburl.searchParams.set('cb', Date.now());
+                calendarIframe.src = cburl.toString();
+            }, 30 * 60 * 1000); // Reload every 30 minutes
+        }
+    })();
+
 </script>
 {{end}}
 

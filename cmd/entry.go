@@ -34,9 +34,13 @@ var entryListCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tNAME\tCREATED AT")
+		fmt.Fprintln(w, "ID\tNAME\tCALENDAR URL\tCREATED AT")
 		for _, entry := range entries {
-			fmt.Fprintf(w, "%d\t%s\t%s\n", entry.ID, entry.Name, entry.CreatedAt.Format(time.RFC3339))
+			calendarURL := entry.CalendarURL
+			if calendarURL == "" {
+				calendarURL = "-"
+			}
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", entry.ID, entry.Name, calendarURL, entry.CreatedAt.Format(time.RFC3339))
 		}
 		w.Flush()
 	},
@@ -48,9 +52,11 @@ var entryCreateCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
+		calendarURL, _ := cmd.Flags().GetString("calendar-url")
 		entry := storage.Entry{
-			Name:      args[0],
-			CreatedAt: time.Now(),
+			Name:        args[0],
+			CalendarURL: calendarURL,
+			CreatedAt:   time.Now(),
 		}
 
 		if err := provider.CreateEntry(ctx, entry); err != nil {
@@ -89,4 +95,6 @@ func init() {
 	entryCmd.AddCommand(entryListCmd)
 	entryCmd.AddCommand(entryCreateCmd)
 	entryCmd.AddCommand(entryDeleteCmd)
+
+	entryCreateCmd.Flags().String("calendar-url", "", "Calendar URL for the entryway")
 }

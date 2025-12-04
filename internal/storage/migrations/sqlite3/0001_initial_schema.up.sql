@@ -11,9 +11,10 @@ CREATE TABLE IF NOT EXISTS migrations (
 -- Index to quickly find the latest migration applied
 CREATE INDEX IF NOT EXISTS idx_migrations_applied_at ON migrations (applied_at DESC);
 
-CREATE TABLE IF NOT EXISTS entryways (
+CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    calendar_url TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP DEFAULT NULL,
     UNIQUE(name)

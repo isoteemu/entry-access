@@ -51,9 +51,9 @@ func defaultQueries() Queries {
 		InsertMigration:        "INSERT INTO migrations (applied_at, version_before, version_after, application_version) VALUES (?, ?, ?, ?)",
 
 		// --- Entry-related queries ---
-		ListEntries: "SELECT id, name, created_at FROM entryways WHERE deleted_at IS NULL ORDER BY created_at DESC",
-		CreateEntry: "INSERT INTO entryways (name, created_at) VALUES (?, ?)",
-		DeleteEntry: "UPDATE entryways SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+		ListEntries: "SELECT id, name, calendar_url, created_at FROM entries WHERE deleted_at IS NULL ORDER BY created_at DESC",
+		CreateEntry: "INSERT INTO entries (name, calendar_url, created_at) VALUES (?, ?, ?)",
+		DeleteEntry: "UPDATE entries SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
 
 		// --- Nonce-related queries ---
 		CreateNonce:  "INSERT INTO nonces (nonce, expires_at) VALUES (?, ?)",
@@ -255,7 +255,7 @@ func (p *SQLProvider) CreateEntry(ctx context.Context, entry Entry) error {
 		createdAt = time.Now()
 	}
 
-	result, err := p.db.ExecContext(ctx, p.Queries.CreateEntry, entry.Name, createdAt)
+	result, err := p.db.ExecContext(ctx, p.Queries.CreateEntry, entry.Name, entry.CalendarURL, createdAt)
 	if err != nil {
 		return fmt.Errorf("failed to create entry: %w", err)
 	}
