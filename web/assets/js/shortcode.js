@@ -33,9 +33,9 @@ async function UUIDtoSAS(uuid) {
     // Wait for emojis to be loaded
     await emojiLoadPromise;
 
-    // Validate UUID length (with hyphens: 36 characters)
-    if (uuid.length !== 36) {
-        throw new Error(`Invalid UUID format: expected 36 characters, got ${uuid.length}`);
+    // Validate UUID is not empty
+    if (!uuid || uuid.length === 0) {
+        throw new Error(`Invalid UUID: cannot be empty`);
     }
 
     // Convert UUID string to bytes for hashing
