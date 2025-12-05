@@ -2,9 +2,7 @@ package utils
 
 import (
 	"bytes"
-	"entry-access-control/internal/storage"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"strings"
 
@@ -54,19 +52,4 @@ func RenderTemplate(c *gin.Context, tmplName string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// Helper to get storage provider from gin context
-func Storage(c *gin.Context) (error, storage.Provider) {
 
-	// Get storage provider from context
-	storageIface, exists := c.Get("Storage")
-	if !exists {
-		slog.Error("Storage provider not found in context")
-		return ErrStorageProviderNotFound, nil
-	}
-	storageProvider, ok := storageIface.(storage.Provider)
-	if !ok {
-		slog.Error("Invalid storage provider type in context")
-		return ErrInvalidStorageProvider, nil
-	}
-	return nil, storageProvider
-}

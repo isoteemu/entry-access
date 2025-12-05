@@ -5,17 +5,25 @@ package routes
 import (
 	"crypto/sha512"
 	"encoding/base64"
+	"entry-access-control/internal/storage"
 	"entry-access-control/internal/utils"
+	"errors"
 	"fmt"
 	"html"
 	"html/template"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	ErrStorageProviderNotFound = errors.New("storage provider not found")
+	ErrInvalidStorageProvider  = errors.New("invalid storage provider")
 )
 
 // sriCache caches computed SRI integrity strings keyed by the src path.
@@ -100,4 +108,20 @@ func TemplateFuncs() template.FuncMap {
 		"script_tag": ScriptTag,
 		"version":    version,
 	}
+}
+
+// GetStorageProvider is a helper to get storage provider from gin context
+func GetStorageProvider(c *gin.Context) (error, storage.Provider) {
+	// Get storage provider from context
+	storageIface, exists := c.Get("Storage")
+	if !exists {
+		slog.Error("Storage provider not found in context")
+		return ErrStorageProviderNotFound, nil
+	}
+	storageProvider, ok := storageIface.(storage.Provider)
+	if !ok {
+		slog.Error("Invalid storage provider type in context")
+		return ErrInvalidStorageProvider, nil
+	}
+	return nil, storageProvider
 }
