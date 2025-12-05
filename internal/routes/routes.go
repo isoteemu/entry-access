@@ -5,18 +5,11 @@ import (
 	"entry-access-control/internal/utils"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
 const LOGIN_URL = "/auth/login"
-
-type errorStruct struct {
-	Status  string   `json:"status"`
-	Message string   `json:"message,omitempty"`
-	Code    []string `json:"code,omitempty"`
-}
 
 // Merge into existing gin.H
 func H(c *gin.Context, data any) gin.H {
@@ -49,8 +42,8 @@ func H(c *gin.Context, data any) gin.H {
 
 func loginUrl(c *gin.Context) string {
 	if c.Request.URL.Path == LOGIN_URL {
-		errorPage(c, http.StatusBadRequest, "Already on login page")
-		c.Abort()
+		AbortWithHTTPError(c, http.StatusBadRequest, ErrInvalidRequest, "Already on login page")
+		return ""
 	}
 
 	return utils.UrlFor(c, "/auth/login", gin.H{"next": c.Request.URL.RequestURI()})
@@ -63,53 +56,4 @@ func HTML(c *gin.Context, code int, name string, data any) {
 	}
 	data = H(c, data)
 	c.HTML(code, name, data)
-}
-
-// General purpose error page renderer
-func errorPage(c *gin.Context, code any, message string) {
-	// Normalize code to both an int HTTP status and a string representation
-	var status int
-	var codeStr string
-
-	// Duck type code
-	switch v := code.(type) {
-	case int:
-		status = v
-		codeStr = "HTTP_" + strconv.Itoa(v) // e.g., HTTP_404
-	case string:
-		codeStr = v
-		if i, err := strconv.Atoi(v); err == nil {
-			slog.Debug("errorPage: code string is numeric", "code", v)
-			status = i
-			errorPage(c, status, message)
-			return
-		} else {
-			status = http.StatusInternalServerError
-		}
-	default:
-		panic("errorPage called with invalid code type")
-	}
-
-	// Check if message is in error codes
-	if message == "" {
-		if _message, exists := ERR_CODES[codeStr]; exists {
-			message = _message
-		}
-	}
-
-	errstruct := errorStruct{
-		Status:  "error",
-		Message: message,
-		Code:    []string{codeStr},
-	}
-
-	// Check the Accept header to determine response type
-	accept := c.GetHeader("Accept")
-	if accept == "application/json" {
-		c.AbortWithStatusJSON(status, errstruct)
-	} else {
-		slog.Debug("Returning error page HTML", "code", status, "message", message)
-		HTML(c, status, "error.html.tmpl", errstruct)
-		c.Abort()
-	}
 }

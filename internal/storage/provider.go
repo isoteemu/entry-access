@@ -3,8 +3,16 @@ package storage
 import (
 	"context"
 	"entry-access-control/internal/config"
+	"errors"
 	"log/slog"
 	"time"
+)
+
+var (
+	// ErrStorageProviderNotFound indicates that the storage provider was not found in the context
+	ErrStorageProviderNotFound = errors.New("storage provider not available")
+	// ErrInvalidStorageProvider indicates that the storage provider in the context is of an invalid type
+	ErrInvalidStorageProvider = errors.New("invalid storage provider")
 )
 
 type Provider interface {

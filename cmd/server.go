@@ -11,6 +11,7 @@ import (
 	"entry-access-control/internal/access"
 	"entry-access-control/internal/config"
 	"entry-access-control/internal/nonce"
+	"entry-access-control/internal/routes"
 	"entry-access-control/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -144,7 +145,7 @@ func ServerMain(ctx context.Context, storageProvider storage.Provider) {
 	}, func(c *gin.Context) {
 		c.Set("RBAC", rbac)
 		c.Next()
-	})
+	}, routes.ErrorHandler())
 
 	RegisterRoutes(server)
 

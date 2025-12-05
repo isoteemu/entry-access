@@ -182,7 +182,7 @@ func RequireAuth() gin.HandlerFunc {
 		}
 		userIdStr, ok := uid.(string)
 		if !ok {
-			errorPage(c, http.StatusInternalServerError, "Invalid user context")
+			AbortWithHTTPError(c, http.StatusInternalServerError, ErrInternalServer, "Invalid user context")
 			return
 		}
 		slog.Debug("RequireAuth: Authenticated user", "userID", userIdStr)

@@ -104,7 +104,13 @@ func EntryRoute(r *gin.RouterGroup) {
 			return
 		}
 
-		if err, _ := checkProvisioning(c); err != nil {
+		// Get device_id from query parameter or header
+		deviceID := c.Query("device_id")
+		if deviceID == "" {
+			deviceID = c.GetHeader("X-Device-ID")
+		}
+
+		if err, _ := getProvisioning(c, deviceID); err != nil {
 			log.Printf("Provisioning check failed: %v", err)
 			c.JSON(http.StatusForbidden, gin.H{"error": "Provisioning check failed"})
 			return
@@ -141,7 +147,13 @@ func EntryRoute(r *gin.RouterGroup) {
 
 	// Router to decide if authentication is needed, or directly grant access
 	r.GET("/:token", func(c *gin.Context) {
-		if err, _ := checkProvisioning(c); err != nil {
+		// Get device_id from query parameter or header
+		deviceID := c.Query("device_id")
+		if deviceID == "" {
+			deviceID = c.GetHeader("X-Device-ID")
+		}
+
+		if err, _ := getProvisioning(c, deviceID); err != nil {
 			log.Printf("Provisioning check failed: %v", err)
 			c.JSON(http.StatusForbidden, gin.H{"error": "Provisioning check failed"})
 			return
@@ -164,7 +176,8 @@ func EntryRoute(r *gin.RouterGroup) {
 		userID, err := verifyAuth(c)
 		if err != nil {
 			slog.Error("Failed to verify auth token", "error", err)
-			errorPage(c, http.StatusUnauthorized, "Failed to verify auth token")
+			AbortWithHTTPError(c, http.StatusUnauthorized, err, "Failed to verify auth token", "AUTH_VERIFY_FAILED")
+			return
 		}
 
 		exists, err := userExists(c, userID)

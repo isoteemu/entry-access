@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"entry-access-control/internal/storage"
 	"entry-access-control/internal/utils"
-	"errors"
 	"fmt"
 	"html"
 	"html/template"
@@ -19,11 +18,6 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-)
-
-var (
-	ErrStorageProviderNotFound = errors.New("storage provider not found")
-	ErrInvalidStorageProvider  = errors.New("invalid storage provider")
 )
 
 // sriCache caches computed SRI integrity strings keyed by the src path.
