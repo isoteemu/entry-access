@@ -15,7 +15,7 @@ func RequirePermission(resource, action string, opts ...map[string]interface{}) 
 
 		userID, err := GetUser(c)
 		if err != nil && err != ErrUserNotFound {
-			AbortWithHTTPError(c, http.StatusInternalServerError, err, "Internal server error")
+			AbortWithHTTPError(c, http.StatusInternalServerError, err)
 			return
 		}
 

@@ -42,7 +42,7 @@ func H(c *gin.Context, data any) gin.H {
 
 func loginUrl(c *gin.Context) string {
 	if c.Request.URL.Path == LOGIN_URL {
-		AbortWithHTTPError(c, http.StatusBadRequest, ErrInvalidRequest, "Already on login page")
+		AbortWithHTTPError(c, http.StatusBadRequest, ErrInvalidRequest)
 		return ""
 	}
 

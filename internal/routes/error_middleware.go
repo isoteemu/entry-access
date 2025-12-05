@@ -90,8 +90,9 @@ func AbortWithError(c *gin.Context, err error) {
 }
 
 // AbortWithHTTPError is a helper to abort with a custom HTTPError
-func AbortWithHTTPError(c *gin.Context, statusCode int, err error, message string, stopCodes ...string) {
-	httpErr := NewHTTPError(statusCode, err, message, stopCodes...)
+// Message defaults to error's message if not provided
+func AbortWithHTTPError(c *gin.Context, statusCode int, err error, stopCodes ...string) {
+	httpErr := NewHTTPError(statusCode, err, "", stopCodes...)
 	c.Error(httpErr)
 	c.Abort()
 	c.Status(statusCode)

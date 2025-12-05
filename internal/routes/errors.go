@@ -36,7 +36,13 @@ func (e *HTTPError) Unwrap() error {
 }
 
 // NewHTTPError creates a new HTTPError
+// If message is empty, it defaults to the error's message
 func NewHTTPError(statusCode int, err error, message string, stopCodes ...string) *HTTPError {
+	// Default to error message if custom message is empty
+	if message == "" && err != nil {
+		message = err.Error()
+	}
+
 	return &HTTPError{
 		Err:        err,
 		StatusCode: statusCode,
@@ -79,6 +85,14 @@ var (
 	// Storage provider errors
 	ErrStorageProviderNotFound = errors.New("storage provider not found")
 	ErrInvalidStorageProvider  = errors.New("invalid storage provider")
+
+	// Provisioning errors
+	ErrDeviceIDVerificationFailed = NewHTTPError(
+		http.StatusBadRequest,
+		errors.New("device ID verification failed"),
+		"",
+		"DEVICE_ID_VERIFICATION_FAILED",
+	)
 )
 
 // errorStatusMap maps errors to HTTP status codes
@@ -212,6 +226,12 @@ var errorInfoMap = map[error]ErrorInfo{
 	},
 	ErrServiceUnavailable: {
 		Message: "Service is temporarily unavailable",
+	},
+
+	// Device ID verification
+	ErrDeviceIDVerificationFailed: {
+		Message:   "Device ID verification failed",
+		StopCodes: []string{"DEVICE_ID_VERIFICATION_FAILED"},
 	},
 }
 

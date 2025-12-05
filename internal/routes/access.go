@@ -176,7 +176,7 @@ func EntryRoute(r *gin.RouterGroup) {
 		userID, err := verifyAuth(c)
 		if err != nil {
 			slog.Error("Failed to verify auth token", "error", err)
-			AbortWithHTTPError(c, http.StatusUnauthorized, err, "Failed to verify auth token", "AUTH_VERIFY_FAILED")
+			AbortWithHTTPError(c, http.StatusUnauthorized, err, "AUTH_VERIFY_FAILED")
 			return
 		}
 
