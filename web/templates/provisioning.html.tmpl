@@ -144,18 +144,20 @@
             window.ErrorHandler.addError("QR_CODE_ERROR", e.detail.error);
         });
     </script>
-}
-    {{ script_tag "/assets/js/device.js" }}
+
     <!-- JavaScript for device provisioning -->
     <script type="module">
-        import {DeviceProvisioning, loadConfig} from '/assets/js/app.js';
+        import {loadConfig} from '/assets/js/app.js';
+        import { DeviceProvisioning } from '/assets/js/device.js';
         import { UUIDtoSAS } from '/assets/js/shortcode.js';
 
         const config = await loadConfig();
+        console.log('App config loaded:', config);
 
         // Initialize device provisioning
         const provisioning = new DeviceProvisioning();
-        const deviceId = provisioning.initialize();
+        await provisioning.initialize();
+        const deviceId = provisioning.getDeviceId();
 
         // Display device ID
         document.getElementById('device-id').textContent = deviceId;
@@ -212,8 +214,8 @@
         }
 
         // Start polling every 2 seconds
-        pollInterval = setInterval(pollAuthorizationStatus, 2000);
-        pollAuthorizationStatus();
+        // pollInterval = setInterval(pollAuthorizationStatus, 2000);
+        // pollAuthorizationStatus();
 
     </script>
 {{end}}
