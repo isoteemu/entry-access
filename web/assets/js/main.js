@@ -1,5 +1,5 @@
 import { PingMonitor } from "./ping.js";
-import { ErrorHandler } from "./error.js";
+import { instance as errorHandler } from "./error.js";
 
 import { loadConfig } from "./app.js";
 
@@ -34,16 +34,14 @@ function run() {
     // Initialize your application
     console.log('App starting...');
 
-    // TODO: Fix the error handler to use latest support info from config
-    let errorOptions = {
-        supportQRUrl: '/dist/assets/support_qr.png',
-        supportContact: localStorage.getItem('support_contact') || config.SupportURL || 'Technical Support',
-        autoShow: true // Automatically show overlay when errors are added
-    };
+    // Update error handler config with loaded settings
+    if (errorHandler.config) {
+        errorHandler.config.supportContact = localStorage.getItem('support_contact') || config.SupportURL || 'Technical Support';
+        errorHandler.config.supportQRUrl = '/dist/assets/support_qr.png';
+        errorHandler.config.autoShow = true;
+    }
 
-    // Initialize the error handler
-    const errorHandler = new ErrorHandler(errorOptions);
-
+    // Make available as window.errorHandler for backward compatibility
     window.errorHandler = errorHandler;
 
     const pingMonitor = new PingMonitor("/api/v1/health", 3);

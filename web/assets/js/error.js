@@ -3,6 +3,9 @@
  * Manages multiple errors with overlay display and support QR code
  */
 export class ErrorHandler {
+
+    static instance = null;
+
     constructor(options = {}) {
         this.errors = new Map();
         this.isVisible = false;
@@ -343,12 +346,29 @@ export class ErrorHandler {
         this.errors.clear();
         document.body.style.overflow = '';
     }
+
+    /**
+     * Get singleton instance
+     * @param {object} options - Configuration options
+     * @returns {ErrorHandler} Singleton instance
+     */
+    static getInstance(options = {}) {
+        if (!ErrorHandler.instance) {
+            ErrorHandler.instance = new ErrorHandler(options);
+        }
+        return ErrorHandler.instance;
+    }
 }
 
+// Create singleton instance
+export const instance = new ErrorHandler();
+
 // Export for module usage
-export default ErrorHandler;
+
+export default instance;
+
 
 // Make available globally for inline event handlers
 if (typeof window !== 'undefined') {
-    window.ErrorHandler = ErrorHandler;
+    window.ErrorHandler = instance;
 }
