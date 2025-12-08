@@ -149,14 +149,5 @@ func LoadConfig(configFile ...string) (*Config, error) {
 		}
 	}
 
-	// Warn if secret is missing - this is a critical security setting for production
-	if cfg.Secret == "" {
-		if os.Getenv("GIN_MODE") == "release" {
-			panic("SECRET configuration variable is required in production")
-		} else {
-			slog.Warn("Secret is not set. Do not use in production.")
-		}
-	}
-
 	return &cfg, nil
 }

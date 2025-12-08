@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	. "entry-access-control/internal"
@@ -77,6 +80,52 @@ func genSupportQr(url string) {
 	}
 }
 
+// generateSecretKey generates a cryptographically secure random secret key
+func generateSecretKey() (string, error) {
+	// Generate 32 bytes (256 bits) of random data
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return "", fmt.Errorf("failed to generate random key: %w", err)
+	}
+	// Encode as base64 for storage
+	return base64.StdEncoding.EncodeToString(key), nil
+}
+
+// ensureSecretKey ensures a secret key exists, either from config, file, or generates one
+func ensureSecretKey(cfg *config.Config) error {
+	// If secret is already set in config, nothing to do
+	if cfg.Secret != "" {
+		return nil
+	}
+
+	secretFilePath := filepath.Join(cfg.InstancePath, ".secret.key")
+
+	// Try to read existing secret from file
+	if data, err := os.ReadFile(secretFilePath); err == nil {
+		secret := strings.TrimSpace(string(data))
+		if secret != "" {
+			cfg.Secret = secret
+			slog.Info("Loaded secret key from file", "path", secretFilePath)
+			return nil
+		}
+	}
+
+	// Generate new secret key
+	secret, err := generateSecretKey()
+	if err != nil {
+		return fmt.Errorf("failed to generate secret key: %w", err)
+	}
+
+	// Try to save to file
+	if err := os.WriteFile(secretFilePath, []byte(secret), 0600); err != nil {
+		return fmt.Errorf("failed to save secret key to file: %w", err)
+	}
+
+	cfg.Secret = secret
+	slog.Info("Generated and saved new secret key", "path", secretFilePath)
+	return nil
+}
+
 func NewAccessListFromConfig(cfg *config.Config) access.AccessList {
 	// Initialize access list
 	// TODO: Load type from config
@@ -118,6 +167,12 @@ func ServerMain(ctx context.Context, storageProvider storage.Provider) {
 
 	if config.Cfg == nil {
 		panic("Config not initialized.")
+	}
+
+	// Ensure secret key exists (load from file or generate new one)
+	if err := ensureSecretKey(config.Cfg); err != nil {
+		slog.Error("Failed to ensure secret key", "error", err)
+		os.Exit(1)
 	}
 
 	// Use the provider passed from cobra command (already initialized)
