@@ -32,6 +32,15 @@ var defaults = map[string]any{
 		"Password": "",
 		"From":     "noreply@example.com",
 	},
+
+	"LDAP": map[string]any{
+		"server":        "nauth2.cc.jyu.fi",
+		"base_dn":       "ou=People,dc=cc,dc=jyu,dc=fi",
+		"bind_dn":       "",
+		"bind_password": "",
+		"use_tls":       true,
+		"insecure_tls":  false,
+	},
 }
 
 func Defaults() map[string]any {

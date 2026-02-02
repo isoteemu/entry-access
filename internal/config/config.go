@@ -47,6 +47,9 @@ type Config struct {
 
 	// Email login configuration
 	Email email.SMTPConfig `mapstructure:",squash"`
+
+	// LDAP
+	LDAP LDAPConfig `mapstructure:"ldap"`
 }
 
 var Cfg *Config
