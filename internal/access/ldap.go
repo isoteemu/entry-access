@@ -16,7 +16,7 @@
 //		slog.Default(),
 //	)
 //
-//	person, err := client.SearchByEmail("user@example.com")
+//	person, err := client.Search("user@example.com")
 //	if err != nil {
 //		// handle error
 //	}
@@ -32,6 +32,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/go-ldap/ldap/v3"
 )
@@ -190,8 +191,8 @@ func ExtractUID(dn string) string {
 	return dn
 }
 
-// SearchByEmail searches for a person in LDAP by email address
-func (c *LDAPClient) SearchByEmail(email string) (*LDAPPerson, error) {
+// Search searches for a person in LDAP by email or uid
+func (c *LDAPClient) Search(email string) (*LDAPPerson, error) {
 	if c.Server == "" || c.BaseDN == "" {
 		return nil, ErrLDAPNotConfigured
 	}
@@ -206,9 +207,14 @@ func (c *LDAPClient) SearchByEmail(email string) (*LDAPPerson, error) {
 		return nil, err
 	}
 
-	// Escape the email for LDAP filter
+	filter := ""
 	escapedEmail := ldap.EscapeFilter(email)
-	filter := fmt.Sprintf("(mail=%s)", escapedEmail)
+	if strings.Contains(email, "@") == true {
+		filter = fmt.Sprintf("(mail=%s)", escapedEmail)
+
+	} else {
+		filter = fmt.Sprintf("(uid=%s)", escapedEmail)
+	}
 
 	c.Logger.Debug("Searching LDAP",
 		slog.String("baseDN", c.BaseDN),

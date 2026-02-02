@@ -106,7 +106,7 @@ func listUsers(ctx context.Context) {
 
 		ldapUID := "-"
 		if ldapClient != nil {
-			person, err := ldapClient.SearchByEmail(userID)
+			person, err := ldapClient.Search(userID)
 			if err == nil && person != nil {
 				ldapUID = access.ExtractUID(person.DN)
 			}
@@ -146,7 +146,7 @@ func searchUserByEmail(ctx context.Context, email string) {
 	}
 
 	// Search for user
-	person, err := ldapClient.SearchByEmail(email)
+	person, err := ldapClient.Search(email)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to search for user: %v\n", err)
 		os.Exit(1)
